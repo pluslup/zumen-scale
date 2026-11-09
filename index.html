@@ -289,7 +289,7 @@ label.chk{display:flex;gap:8px;align-items:center;font-size:13px}
 (() => {
 const $ = s => document.querySelector(s);
 const PAPERS = {A4:[210,297],A3:[297,420],A2:[420,594],A1:[594,841],B4:[257,364],B3:[364,515]};
-const MAXSIDE = 7000;
+const MAXSIDE = 8192, MAXAREA = 15e6;   // iPad Safari refuses canvases above ~16.7M px
 const COLORS = {red:'#d7263d', blue:'#1f6fd1', black:'#1c1c1c', green:'#2c8a3e'};
 const PEN_MM = {s:0.35, m:0.7, l:1.4}, TEXT_MM = {s:3.5, m:5, l:8};
 const EXPORT_MM_PER_PX = 0.22;   // 1 on-screen px of a dimension mark ≈ 0.22 mm on paper
@@ -297,7 +297,8 @@ const COARSE = matchMedia('(pointer:coarse)').matches;
 const S = { src:null, name:'', kind:'image', pxPerMm0:null, imgScale:1, pdf:null, page:1, pageState:{},
   lines:[], sel:-1, asIs:false, anns:[], hist:[], tool:'line', pending:null, hover:null, measure:null, stroke:null,
   view:{k:1,ox:0,oy:0}, mode:'u', sample:true, color:'red', size:'m', ortho:false, penSeen:false,
-  fmt:'pdf', withAnns:false, editing:undefined, textAt:null, textSize:20, loadNote:'' };
+  fmt:'pdf', withAnns:false, editing:undefined, textAt:null, textSize:20, loadNote:'',
+  pdfPage:null, pdfBytes:null, srcScale:1, rot:0, hi:null, hiTask:null, srcGen:0, pageHasAnnots:false };
 
 const cv = $('#cv'), ctx = cv.getContext('2d'), stage = $('#stage');
 let dpr = 1;
@@ -428,6 +429,8 @@ function paint(){
   ctx.setTransform(dpr*v.k,0,0,dpr*v.k,dpr*v.ox,dpr*v.oy);
   ctx.imageSmoothingEnabled = v.k < 3;
   ctx.drawImage(S.src, 0, 0);
+  if(S.hi && S.hi.key === hiKey()){ ctx.imageSmoothingEnabled = true; ctx.drawImage(S.hi.c, S.hi.x, S.hi.y, S.hi.w, S.hi.h); }
+  scheduleHi();
   const px = n => n/v.k, c = calib(), mark = css('--mark'), mark2 = css('--mark2');
   if($('#showCal').checked) S.lines.forEach((l,i) => {
     drawDim(ctx, l.a, l.b, {color:mark, label: circ(i)+'  '+(l.real>0 ? fmt(l.real)+' mm' : '寸法を入力'), px,
@@ -444,6 +447,40 @@ function paint(){
     drawDim(ctx, S.pending, b, {color:S.tool==='measure'?mark2:mark, label:lbl, px, dashed:true});
   }
   $('#zoomLbl').textContent = Math.round(v.k*100) + '%';
+}
+
+/* ---------- sharp PDF view: re-render the visible part from the PDF itself at screen resolution ---------- */
+const hiKey = () => S.srcGen + ':' + S.rot;
+let hiTimer = 0;
+function scheduleHi(){ if(!S.pdfPage) return; clearTimeout(hiTimer); hiTimer = setTimeout(renderHi, 160); }
+async function renderHi(){
+  const page = S.pdfPage; if(!page || !S.src) return;
+  const r = stage.getBoundingClientRect(), v = S.view;
+  let m = v.k * dpr;
+  const x0 = Math.max(0, -v.ox/v.k), y0 = Math.max(0, -v.oy/v.k);
+  const x1 = Math.min(S.src.width, (r.width-v.ox)/v.k), y1 = Math.min(S.src.height, (r.height-v.oy)/v.k);
+  if(x1 <= x0 || y1 <= y0) return;
+  const key = hiKey(), hi = S.hi;
+  if(hi && hi.key===key && hi.m >= m*0.95 && hi.m <= m*1.6 &&
+     x0 >= hi.x-0.5 && y0 >= hi.y-0.5 && x1 <= hi.x+hi.w+0.5 && y1 <= hi.y+hi.h+0.5) return;
+  const pw = (x1-x0)*0.25, ph = (y1-y0)*0.25;
+  const rx0 = Math.max(0, x0-pw), ry0 = Math.max(0, y0-ph);
+  const rx1 = Math.min(S.src.width, x1+pw), ry1 = Math.min(S.src.height, y1+ph);
+  m = Math.min(m, 12, Math.sqrt(12e6/((rx1-rx0)*(ry1-ry0))));
+  if(hi && hi.key===key && Math.abs(hi.m-m)/m < 0.05 && rx0 >= hi.x-0.5 && ry0 >= hi.y-0.5 && rx1 <= hi.x+hi.w+0.5 && ry1 <= hi.y+hi.h+0.5) return;
+  const cw = Math.max(1, Math.ceil((rx1-rx0)*m)), ch = Math.max(1, Math.ceil((ry1-ry0)*m));
+  if(S.hiTask){ try{ S.hiTask.cancel(); }catch(_){} }
+  const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0,0,cw,ch);
+  const vp = page.getViewport({scale:S.srcScale*m, rotation:(page.rotate + 90*S.rot) % 360});
+  const task = page.render({canvas:c, canvasContext:g, viewport:vp, transform:[1,0,0,1,-rx0*m,-ry0*m]});
+  S.hiTask = task;
+  try{ await task.promise; }catch(_){ return; }
+  if(S.hiTask !== task || S.pdfPage !== page || key !== hiKey()){ c.width = 0; return; }
+  S.hiTask = null;
+  if(S.hi) S.hi.c.width = 0;
+  S.hi = {c, x:rx0, y:ry0, w:cw/m, h:ch/m, m, key};
+  draw();
 }
 
 /* ---------- hit testing ---------- */
@@ -768,6 +805,7 @@ $('#rot').onclick = () => {
     if(a.type==='text') a.p = rp(a.p);
   });
   S.hist = [];
+  S.rot = (S.rot+1) % 4; if(S.hi){ S.hi.c.width = 0; S.hi = null; }
   S.src = c; updateBadge(); fit(); updateDerived();
 };
 
@@ -916,6 +954,8 @@ window.addEventListener('drop', e => {
 document.addEventListener('paste', e => { const f=[...(e.clipboardData?.files||[])][0]; if(f && okType(f)) load(f); });
 function okType(f){ return /^(application\/pdf|image\/jpeg|image\/png)$/.test(f.type) || /\.(pdf|jpe?g|png)$/i.test(f.name); }
 
+const PDF_OPTS = () => { const u = d => new URL('pdfjs/'+d+'/', location.href).href;
+  return {cMapUrl:u('cmaps'), cMapPacked:true, standardFontDataUrl:u('standard_fonts'), wasmUrl:u('wasm'), iccUrl:u('iccs')}; };
 let _pdfjs=null;
 async function getPdfjs(){
   if(_pdfjs) return _pdfjs;
@@ -940,7 +980,8 @@ async function load(file){
     if(file.type==='application/pdf' || /\.pdf$/i.test(file.name)){
       const pdfjsLib = await getPdfjs();
       const buf = await file.arrayBuffer();
-      S.pdf = await pdfjsLib.getDocument({data:buf}).promise;
+      S.pdfBytes = new Uint8Array(buf.slice(0));
+      S.pdf = await pdfjsLib.getDocument({data:new Uint8Array(buf), ...PDF_OPTS()}).promise;
       S.kind = 'pdf';
       const sel = $('#pageSel'); sel.innerHTML='';
       for(let i=1;i<=S.pdf.numPages;i++) sel.add(new Option(i+' / '+S.pdf.numPages, i));
@@ -955,10 +996,11 @@ async function load(file){
         }
       }catch(_){}
     } else {
-      S.pdf = null; S.kind='image'; $('#pageRow').hidden = true;
+      S.pdf = null; S.pdfPage = null; S.pdfBytes = null; S.kind='image'; $('#pageRow').hidden = true;
+      S.rot = 0; S.hi = null; S.srcGen++;
       const url = URL.createObjectURL(file);
       const img = await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>rej(new Error('画像を開けませんでした。')); im.src=url; });
-      const k = Math.min(1, MAXSIDE/Math.max(img.naturalWidth,img.naturalHeight));
+      const k = Math.min(1, MAXSIDE/Math.max(img.naturalWidth,img.naturalHeight), Math.sqrt(MAXAREA/(img.naturalWidth*img.naturalHeight)));
       const c = document.createElement('canvas'); c.width=Math.round(img.naturalWidth*k); c.height=Math.round(img.naturalHeight*k);
       const g = c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url);
       S.src = c; S.imgScale = k;
@@ -974,12 +1016,16 @@ async function load(file){
 async function renderPage(n){
   const page = await S.pdf.getPage(n);
   const vp1 = page.getViewport({scale:1});
-  const sc = Math.min(200/72, MAXSIDE/Math.max(vp1.width, vp1.height));
+  const sc = Math.min(300/72, MAXSIDE/Math.max(vp1.width, vp1.height), Math.sqrt(MAXAREA/(vp1.width*vp1.height)));
   const vp = page.getViewport({scale:sc});
   const c = document.createElement('canvas'); c.width=Math.round(vp.width); c.height=Math.round(vp.height);
   const g = c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height);
   await page.render({canvas:c, canvasContext:g, viewport:vp}).promise;
+  if(S.hiTask){ try{ S.hiTask.cancel(); }catch(_){} S.hiTask = null; }
+  if(S.hi){ S.hi.c.width = 0; S.hi = null; }
   S.src = c; S.page = n; S.pxPerMm0 = sc*72/25.4;
+  S.pdfPage = page; S.srcScale = sc; S.rot = 0; S.srcGen++;
+  try{ const an = await page.getAnnotations(); S.pageHasAnnots = an.some(a => a.subtype !== 'Link'); }catch(_){ S.pageHasAnnots = true; }
 }
 $('#pageSel').onchange = async e => {
   commitText();
@@ -1024,24 +1070,55 @@ function placement(c){
   const {W,H} = outSize(c), P = pickPaper(W,H);
   return {W, H, P, x:(P.pw-W)/2 + (+$('#offX').value||0), y:(P.ph-H)/2 + (+$('#offY').value||0)};
 }
+function dataUrlBytes(u){ const bin = atob(u.split(',')[1]), b = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) b[i] = bin.charCodeAt(i); return b; }
+// Draw the original PDF page as vectors, mapped exactly onto the calibrated placement.
+async function placeVectorPage(doc, page, c, x, y, P){
+  if(S.kind!=='pdf' || !S.pdfBytes || !S.pdfPage || S.pageHasAnnots) return false;
+  try{
+    const L = window.PDFLib, PT = 72/25.4;
+    const src = await L.PDFDocument.load(S.pdfBytes, {ignoreEncryption:true, updateMetadata:false});
+    if(src.isEncrypted) return false;
+    const v = S.pdfPage.view, Wc = v[2]-v[0], Hc = v[3]-v[1], sc = S.srcScale;
+    const ep = await doc.embedPage(src.getPage(S.page-1), {left:v[0], bottom:v[1], right:v[2], top:v[3]});
+    const R = ((S.pdfPage.rotate + 90*S.rot) % 360 + 360) % 360;
+    // source-pixel (u,v) as a function of form coords (fx,fy), y-up, origin at crop box corner
+    let ua,ub,uc,va,vb,vc;
+    if(R===0){ ua=sc; ub=0; uc=0; va=0; vb=-sc; vc=sc*Hc; }
+    else if(R===90){ ua=0; ub=sc; uc=0; va=sc; vb=0; vc=0; }
+    else if(R===180){ ua=-sc; ub=0; uc=sc*Wc; va=0; vb=sc; vc=0; }
+    else { ua=0; ub=-sc; uc=sc*Hc; va=-sc; vb=0; vc=sc*Wc; }
+    const a = PT*c.sx*ua, cc = PT*c.sx*ub, e = PT*(x + c.sx*uc);
+    const b = -PT*c.sy*va, d = -PT*c.sy*vb, f = PT*(P.ph - y - c.sy*vc);
+    const name = page.node.newXObject('ZumenPage', ep.ref);
+    page.pushOperators(L.pushGraphicsState(), L.concatTransformationMatrix(a,b,cc,d,e,f), L.drawObject(name), L.popGraphicsState());
+    return true;
+  }catch(err){ console.warn('vector export failed, using image', err); return false; }
+}
 async function makePdf(c, withA){
   const {W,H,P,x,y} = placement(c), r = ratio();
   const PT = 72/25.4, {PDFDocument, rgb, StandardFonts} = window.PDFLib;
-  let srcCanvas = S.src;
-  if(withA){
-    srcCanvas = document.createElement('canvas'); srcCanvas.width = S.src.width; srcCanvas.height = S.src.height;
-    const g = srcCanvas.getContext('2d'); g.drawImage(S.src, 0, 0); renderAnns(g, exportPx(c), c, false);
-  }
-  const b64 = srcCanvas.toDataURL('image/jpeg', 0.92).split(',')[1];
-  if(srcCanvas !== S.src) srcCanvas.width = srcCanvas.height = 0;
-  const bin = atob(b64), bytes = new Uint8Array(bin.length);
-  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  const srcCanvas = S.src;
   const doc = await PDFDocument.create();
   doc.setTitle(`${S.name||'drawing'} 1:${r}`); doc.setKeywords(['zumen-scale', 'ratio='+r]); doc.setProducer('zumen-scale');
   const page = doc.addPage([P.pw*PT, P.ph*PT]);
   const font = await doc.embedFont(StandardFonts.Helvetica);
-  const img = await doc.embedJpg(bytes);
-  page.drawImage(img, {x:x*PT, y:(P.ph-y-H)*PT, width:W*PT, height:H*PT});
+  if(srcCanvas !== S.src) srcCanvas.width = srcCanvas.height = 0;
+  const vector = await placeVectorPage(doc, page, c, x, y, P);
+  if(!vector){
+    let rc = S.src;
+    if(withA){ rc = document.createElement('canvas'); rc.width = S.src.width; rc.height = S.src.height;
+      const g = rc.getContext('2d'); g.drawImage(S.src, 0, 0); renderAnns(g, exportPx(c), c, false); }
+    const img = await doc.embedJpg(dataUrlBytes(rc.toDataURL('image/jpeg', 0.92)));
+    if(rc !== S.src) rc.width = rc.height = 0;
+    page.drawImage(img, {x:x*PT, y:(P.ph-y-H)*PT, width:W*PT, height:H*PT});
+  } else if(withA){
+    const oc = document.createElement('canvas'); oc.width = S.src.width; oc.height = S.src.height;
+    renderAnns(oc.getContext('2d'), exportPx(c), c, false);
+    const ov = await doc.embedPng(dataUrlBytes(oc.toDataURL('image/png')));
+    oc.width = oc.height = 0;
+    page.drawImage(ov, {x:x*PT, y:(P.ph-y-H)*PT, width:W*PT, height:H*PT});
+  }
+  S.lastVector = vector;
   const ln = (x1,y1,x2,y2) => page.drawLine({start:{x:x1*PT,y:(P.ph-y1)*PT}, end:{x:x2*PT,y:(P.ph-y2)*PT}, thickness:0.35*PT, color:rgb(0,0,0)});
   if($('#bar').checked){
     const bx=12, by=P.ph-10;
@@ -1099,6 +1176,9 @@ $('#exportBtn').onclick = async () => {
     const base = (S.name||'drawing').replace(/[\\/:*?"<>|]/g,'_');
     const filename = `${base}_S1-${r}_${P.name}${withA ? '_書き込みあり' : ''}.${S.fmt}`;
     await deliver(blob, filename);
+    if(S.fmt==='pdf' && S.kind==='pdf') $('#exportMsg').insertAdjacentHTML('beforeend', S.lastVector
+      ? note('元のPDFの線と文字を、画像にせずそのまま出力しました。','good')
+      : note('このPDFは注釈やコメントを含む、または保護されているため、画像として出力しました。'));
   }catch(err){
     msg.innerHTML = note('作成できませんでした：' + esc(err.message||err), 'bad');
   }finally{ btn.disabled = false; btn.textContent = label; }
