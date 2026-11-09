@@ -228,6 +228,7 @@ label.chk{display:flex;gap:8px;align-items:center;font-size:13px}
       <canvas id="preview" aria-label="用紙プレビュー"></canvas>
       <div id="paperNote"></div>
       <button type="button" class="primary" id="exportBtn">PDFを書き出す</button>
+      <p class="hint" id="exportPage" hidden>複数ページのPDFは、表示中のページを出力します。</p>
       <p class="hint" id="exportHint">印刷するときは「実際のサイズ」または倍率 100% を選んでください（「用紙に合わせる」は不可）。印刷後、スケールバーを定規で測ると確認できます。</p>
       <div id="exportMsg"></div>
     </section>
@@ -244,6 +245,11 @@ label.chk{display:flex;gap:8px;align-items:center;font-size:13px}
           <button type="button" data-tool="text" aria-pressed="false" title="文字（T）">文字</button>
           <button type="button" data-tool="erase" aria-pressed="false" title="書き込みを消す（E）">消す</button>
           <button type="button" data-tool="pan" aria-pressed="false" title="移動（右ドラッグ / H / Space押しながら）">移動</button>
+        </div>
+        <div class="tb" id="pageNav" hidden role="group" aria-label="ページ">
+          <button type="button" id="pgPrev" title="前のページ（PageUp）" aria-label="前のページ">◀</button>
+          <span class="grp num" id="pgLbl" style="color:var(--ink);font-weight:600">1 / 1</span>
+          <button type="button" id="pgNext" title="次のページ（PageDown）" aria-label="次のページ">▶</button>
         </div>
         <div class="tb"><button type="button" id="undoBtn" title="元に戻す（Ctrl/⌘+Z）">↶ 戻す</button></div>
         <div class="tb" role="group" aria-label="表示">
@@ -318,6 +324,10 @@ function calib(){
   const ls = S.lines.filter(l => l.real > 0 && len(l) > 2);
   if(!ls.length){
     if(S.asIs && S.pxPerMm0) return {sx:1/S.pxPerMm0, sy:1/S.pxPerMm0, note:'', n:0, asIs:true};
+    if(S.inherit && S.kind==='pdf'){
+      const odd = S.rot % 2 === 1;
+      return {sx:(odd?S.inherit.y:S.inherit.x)/S.srcScale, sy:(odd?S.inherit.x:S.inherit.y)/S.srcScale, note:'', n:0, asIs:false, inherited:S.inherit.page};
+    }
     return null;
   }
   let w=0, s=0;
@@ -335,7 +345,7 @@ function calib(){
   return {sx, sy, note:nt, n:ls.length, asIs:false};
 }
 function lineErr(l, c){
-  if(!c || c.asIs || !(l.real>0)) return null;
+  if(!c || c.asIs || c.inherited || !(l.real>0)) return null;
   const printed = Math.hypot((l.b.x-l.a.x)*c.sx, (l.b.y-l.a.y)*c.sy);
   const target = l.real/ratio();
   return (printed-target)/target;
@@ -770,6 +780,8 @@ window.addEventListener('keydown', e => {
   if(e.key===' ' && !typing){ spaceDown = true; e.preventDefault(); }
   if(typing) return;
   if((e.metaKey||e.ctrlKey) && (e.key==='z'||e.key==='Z')){ e.preventDefault(); undo(); return; }
+  if(e.key==='PageDown'){ e.preventDefault(); gotoPage(S.page+1); return; }
+  if(e.key==='PageUp'){ e.preventDefault(); gotoPage(S.page-1); return; }
   if(e.key==='Escape'){ S.pending=null; setTipDefault(); draw(); }
   if(e.key==='Delete'||e.key==='Backspace'){
     if(S.tool==='measure' && S.measure){ S.measure=null; updateMeasureBar(); draw(); }
@@ -790,13 +802,17 @@ $('#panelBtn').onclick = () => {
   $('#panelBtn').textContent = on ? 'パネルを表示' : '図面を広く';
   setTimeout(fit, 30);
 };
-$('#rot').onclick = () => {
-  if(!S.src) return;
-  commitText();
+function rotateCanvas(){
   const s = S.src, c = document.createElement('canvas');
   c.width = s.height; c.height = s.width;
   const g = c.getContext('2d'); g.translate(c.width,0); g.rotate(Math.PI/2); g.drawImage(s,0,0);
-  const H = s.height, rp = p => ({x:H-p.y, y:p.x});
+  s.width = 0; S.src = c;
+  S.rot = (S.rot+1) % 4; if(S.hi){ S.hi.c.width = 0; S.hi = null; }
+}
+$('#rot').onclick = () => {
+  if(!S.src) return;
+  commitText();
+  const H = S.src.height, rp = p => ({x:H-p.y, y:p.x});
   S.lines.forEach(l => { l.a=rp(l.a); l.b=rp(l.b); });
   if(S.measure){ S.measure.a=rp(S.measure.a); S.measure.b=rp(S.measure.b); }
   S.anns.forEach(a => {
@@ -805,8 +821,7 @@ $('#rot').onclick = () => {
     if(a.type==='text') a.p = rp(a.p);
   });
   S.hist = [];
-  S.rot = (S.rot+1) % 4; if(S.hi){ S.hi.c.width = 0; S.hi = null; }
-  S.src = c; updateBadge(); fit(); updateDerived();
+  rotateCanvas(); updateBadge(); fit(); updateDerived();
 };
 
 /* ---------- side panel ---------- */
@@ -880,9 +895,9 @@ function updateDerived(){
   }
   $('#exportBtn').disabled = false;
   const {W,H} = outSize(c);
-  let rows = `<dt>基準</dt><dd>${c.asIs ? '資料の寸法どおり' : `寸法線 <span class="num">${c.n}</span> 本`}</dd>`;
+  let rows = `<dt>基準</dt><dd>${c.asIs ? '資料の寸法どおり' : c.inherited ? `${c.inherited} ページ目の縮尺` : `寸法線 <span class="num">${c.n}</span> 本`}</dd>`;
   rows += `<dt>出力サイズ</dt><dd class="num big">${fmt(W,1)} × ${fmt(H,1)} mm</dd>`;
-  if(S.pxPerMm0 && !c.asIs){
+  if(S.pxPerMm0 && !c.asIs && !c.inherited){
     const px = c.sx*S.pxPerMm0*100, py = c.sy*S.pxPerMm0*100;
     const cur = S.mode==='xy' ? `1/${fmt(r*px/100,1)}（横） 1/${fmt(r*py/100,1)}（縦）` : `1/${fmt(r*px/100,1)}`;
     rows += `<dt>元資料の実際の縮尺</dt><dd class="num">${cur}</dd>`;
@@ -891,7 +906,8 @@ function updateDerived(){
   dl.innerHTML = rows;
   let n = S.loadNote ? note(S.loadNote,'good') : '';
   if(c.note) n += note(c.note,'warn');
-  if(!c.asIs){
+  if(c.inherited) n += note(`このページには寸法線がないため、${c.inherited} ページ目で合わせた縮尺を使っています。縮尺が違うページなら、このページでも寸法線を引いてください。`,'warn');
+  if(!c.asIs && !c.inherited){
     if(S.pxPerMm0 && S.mode==='xy') n += note('縦横の倍率が違うため、コピー機では補正できません。書き出したファイルを使ってください。');
     else if(S.pxPerMm0) n += note(`元資料を原寸（100%）で印刷している場合、コピー機をこの倍率にしても 1/${fmt(r)} になります。`);
     else if(S.kind==='image') n += note('画像の解像度（dpi）を入れると、コピー機の倍率も表示できます。');
@@ -985,7 +1001,7 @@ async function load(file){
       S.kind = 'pdf';
       const sel = $('#pageSel'); sel.innerHTML='';
       for(let i=1;i<=S.pdf.numPages;i++) sel.add(new Option(i+' / '+S.pdf.numPages, i));
-      $('#pageRow').hidden = S.pdf.numPages < 2;
+      S.page = 0; S.inherit = null;
       await renderPage(1);
       try{
         const md = await S.pdf.getMetadata();
@@ -996,7 +1012,7 @@ async function load(file){
         }
       }catch(_){}
     } else {
-      S.pdf = null; S.pdfPage = null; S.pdfBytes = null; S.kind='image'; $('#pageRow').hidden = true;
+      S.pdf = null; S.pdfPage = null; S.pdfBytes = null; S.kind='image'; S.inherit = null;
       S.rot = 0; S.hi = null; S.srcGen++;
       const url = URL.createObjectURL(file);
       const img = await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>rej(new Error('画像を開けませんでした。')); im.src=url; });
@@ -1008,6 +1024,9 @@ async function load(file){
     }
     $('#fname').textContent = file.name;
     $('#dpiRow').hidden = S.kind!=='image';
+    syncPageUi();
+    if(S.kind==='pdf' && S.pdf.numPages > 1)
+      $('#loadMsg').innerHTML = note(`このPDFは ${S.pdf.numPages} ページあります。図面の上の ◀ ▶ でページを切り替えられます。`);
     updateBadge(); fit(); renderList(); setTool(S.asIs ? 'measure' : 'line');
   }catch(err){
     $('#loadMsg').innerHTML = note(esc(err.message||'読み込みに失敗しました。') + ' ファイルが壊れていないか確認してください。','bad');
@@ -1027,15 +1046,34 @@ async function renderPage(n){
   S.pdfPage = page; S.srcScale = sc; S.rot = 0; S.srcGen++;
   try{ const an = await page.getAnnotations(); S.pageHasAnnots = an.some(a => a.subtype !== 'Link'); }catch(_){ S.pageHasAnnots = true; }
 }
-$('#pageSel').onchange = async e => {
+let pageBusy = false;
+async function gotoPage(n){
+  if(!S.pdf || pageBusy) return;
+  n = Math.max(1, Math.min(S.pdf.numPages, n));
+  if(n === S.page) return;
+  pageBusy = true;
   commitText();
-  S.pageState[S.page] = {lines:S.lines, anns:S.anns, hist:S.hist};
-  $('#busy').hidden=false;
-  try{ await renderPage(+e.target.value); } finally { $('#busy').hidden=true; }
-  const st = S.pageState[S.page] || {lines:[], anns:[], hist:[]};
+  const c = calib();
+  if(c && !c.asIs && !c.inherited) S.inherit = {x:c.sx*S.srcScale, y:c.sy*S.srcScale, page:S.page};
+  S.pageState[S.page] = {lines:S.lines, anns:S.anns, hist:S.hist, rot:S.rot};
+  $('#busy').hidden = false;
+  try{ await renderPage(n); } finally { $('#busy').hidden = true; pageBusy = false; }
+  const st = S.pageState[S.page] || {lines:[], anns:[], hist:[], rot:0};
+  for(let i=0;i<(st.rot||0);i++) rotateCanvas();
   S.lines = st.lines; S.anns = st.anns; S.hist = st.hist; S.measure = null; S.sel = -1;
-  updateBadge(); fit(); renderList();
-};
+  syncPageUi(); updateBadge(); fit(); renderList();
+}
+function syncPageUi(){
+  const n = S.pdf ? S.pdf.numPages : 1, multi = S.kind==='pdf' && n > 1;
+  $('#pageNav').hidden = !multi; $('#pageRow').hidden = !multi; $('#exportPage').hidden = !multi;
+  if(!multi) return;
+  $('#pgLbl').textContent = `${S.page} / ${n}`;
+  $('#pageSel').value = String(S.page);
+  $('#pgPrev').disabled = S.page <= 1; $('#pgNext').disabled = S.page >= n;
+}
+$('#pageSel').onchange = e => gotoPage(+e.target.value);
+$('#pgPrev').onclick = () => gotoPage(S.page - 1);
+$('#pgNext').onclick = () => gotoPage(S.page + 1);
 $('#dpi').addEventListener('input', e => { const v=+e.target.value; S.pxPerMm0 = v>0 ? v/25.4*(S.imgScale||1) : null; updateDerived(); draw(); });
 function updateBadge(){
   const kb = $('#kindBadge');
@@ -1174,7 +1212,8 @@ $('#exportBtn').onclick = async () => {
     const withA = S.withAnns && S.anns.length > 0, r = ratio();
     const {blob, P} = S.fmt==='png' ? await makePng(c, withA) : await makePdf(c, withA);
     const base = (S.name||'drawing').replace(/[\\/:*?"<>|]/g,'_');
-    const filename = `${base}_S1-${r}_${P.name}${withA ? '_書き込みあり' : ''}.${S.fmt}`;
+    const pg = S.kind==='pdf' && S.pdf && S.pdf.numPages > 1 ? `_p${S.page}` : '';
+    const filename = `${base}${pg}_S1-${r}_${P.name}${withA ? '_書き込みあり' : ''}.${S.fmt}`;
     await deliver(blob, filename);
     if(S.fmt==='pdf' && S.kind==='pdf') $('#exportMsg').insertAdjacentHTML('beforeend', S.lastVector
       ? note('元のPDFの線と文字を、画像にせずそのまま出力しました。','good')
