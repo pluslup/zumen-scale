@@ -19,5 +19,5 @@ MacBook（ブラウザ）と iPad（Apple Pencil・画面テンキー対応）�
 
 ## 使用ライブラリ
 
-- [PDF.js](https://github.com/mozilla/pdf.js)（Apache License 2.0）— `lib/LICENSE-pdfjs.txt`
-- [pdf-lib](https://github.com/Hopding/pdf-lib)（MIT License）— `lib/LICENSE-pdf-lib.txt`
+- [PDF.js](https://github.com/mozilla/pdf.js)（Apache License 2.0）— `LICENSE-pdfjs.txt`
+- [pdf-lib](https://github.com/Hopding/pdf-lib)（MIT License）— `LICENSE-pdf-lib.txt`

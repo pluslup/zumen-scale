@@ -9,10 +9,10 @@
 <meta name="apple-mobile-web-app-title" content="スケール合わせ">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#0a6f6a">
-<link rel="manifest" href="manifest.webmanifest">
+<link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<script src="lib/pdf-lib.min.js"></script>
+<script src="pdf-lib.min.js"></script>
 <style>
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font-size:14px;font-family:system-ui,sans-serif;-webkit-text-size-adjust:100%;overscroll-behavior:none}
@@ -1159,14 +1159,14 @@ window.addEventListener('drop', e => {
 document.addEventListener('paste', e => { const f=[...(e.clipboardData?.files||[])][0]; if(f && okType(f)) load(f); });
 function okType(f){ return /^(application\/pdf|image\/jpeg|image\/png)$/.test(f.type) || /\.(pdf|jpe?g|png)$/i.test(f.name); }
 
-const PDF_OPTS = () => { const u = d => new URL('pdfjs/'+d+'/', location.href).href;
+const PDF_OPTS = () => { const u = d => new URL('./', location.href).href;   // flat layout: every file sits next to index.html
   return {cMapUrl:u('cmaps'), cMapPacked:true, standardFontDataUrl:u('standard_fonts'), wasmUrl:u('wasm'), iccUrl:u('iccs')}; };
 let _pdfjs=null;
 async function getPdfjs(){
   if(_pdfjs) return _pdfjs;
   try{
-    const m = await import('./lib/pdf.min.mjs');
-    m.GlobalWorkerOptions.workerSrc = new URL('./lib/pdf.worker.min.mjs', location.href).href;
+    const m = await import('./pdf.min.mjs');
+    m.GlobalWorkerOptions.workerSrc = new URL('./pdf.worker.min.mjs', location.href).href;
     return _pdfjs = m;
   }catch(e){ throw new Error('PDF読み込み部品を開けませんでした。'); }
 }
@@ -1550,6 +1550,12 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { dr
 new MutationObserver(() => { draw(); updateDerived(); }).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
 if(document.fonts) document.fonts.ready.then(() => { _font = null; draw(); });
 setPhase('start');
+const ob = $('#offlineBadge'); ob.hidden = false;
+if('serviceWorker' in navigator && window.isSecureContext){
+  navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then(() => {
+    ob.textContent = 'オフライン対応済み'; ob.style.background = 'var(--accent)'; ob.style.color = 'var(--accent-ink)';
+  }).catch(() => { ob.textContent = 'オフライン未対応'; });
+} else { ob.textContent = window.isSecureContext ? 'オフライン未対応のブラウザ' : 'オフラインにはHTTPSで開いてください'; }
 })();
 </script>
 
