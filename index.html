@@ -273,6 +273,7 @@ input.tk-active{outline:2px solid var(--accent);outline-offset:1px}
     <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5 M15 4h5v5 M20 15v5h-5 M9 20H4v-5"/></symbol>
     <symbol id="i-rot" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 11-2.2-5.3 M19.5 4v5h-5"/></symbol>
     <symbol id="i-wide" viewBox="0 0 24 24"><path d="M3.5 5h17v14h-17z M9 5v14 M13 12h5 M16 9.5l2.5 2.5-2.5 2.5"/></symbol>
+    <symbol id="i-move" viewBox="0 0 24 24"><path d="M12 3v18 M3 12h18 M9 6l3-3 3 3 M9 18l3 3 3-3 M6 9l-3 3 3 3 M18 9l3 3-3 3"/></symbol>
     <symbol id="i-prev" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
     <symbol id="i-next" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
   </defs>
@@ -367,7 +368,8 @@ input.tk-active{outline:2px solid var(--accent);outline-offset:1px}
       <ul class="howto plain">
         <li><b>計測</b>：2点をなぞると実寸を表示。「図面に残す」で記入</li>
         <li>残した寸法は、線や数字をつかんで移動、端点で長さ調整</li>
-        <li><b>ペン</b>・<b>文字</b>で書き込み、<b>消す</b>で削除</li>
+        <li><b>ペン</b>・<b>文字</b>で書き込み、<b>消しゴム</b>で削除</li>
+        <li><b>動かす</b>：寸法・文字・ペンの書き込みをつかんで移動（文字は「文字」のままでもドラッグで移動）</li>
       </ul>
       <div class="counts"><span>残した寸法 <b id="cntDim">0</b></span><span>ペン <b id="cntPen">0</b></span><span>文字 <b id="cntText">0</b></span></div>
       <div class="row">
@@ -421,7 +423,8 @@ input.tk-active{outline:2px solid var(--accent);outline-offset:1px}
           <button type="button" class="tbtn ph-work" data-tool="pen" aria-pressed="false" title="ペン（P）"><svg><use href="#i-pen"/></svg><span>ペン</span></button>
           <button type="button" class="tbtn ph-work" data-tool="text" aria-pressed="false" title="文字（T）"><svg><use href="#i-text"/></svg><span>文字</span></button>
           <button type="button" class="tbtn ph-work" data-tool="erase" aria-pressed="false" title="消しゴム（E）"><svg><use href="#i-eraser"/></svg><span>消しゴム</span></button>
-          <button type="button" class="tbtn" data-tool="pan" aria-pressed="false" title="移動（右ドラッグ / H / Space）"><svg><use href="#i-hand"/></svg><span>移動</span></button>
+          <button type="button" class="tbtn ph-work" data-tool="select" aria-pressed="false" title="書き込みを動かす（V）"><svg><use href="#i-move"/></svg><span>動かす</span></button>
+          <button type="button" class="tbtn" data-tool="pan" aria-pressed="false" title="画面移動（右ドラッグ / H / Space）"><svg><use href="#i-hand"/></svg><span>画面移動</span></button>
         </div>
         <div class="tb ph-work" role="group" aria-label="取り消し">
           <button type="button" class="tbtn" id="undoBtn" title="元に戻す（⌘Z / Ctrl+Z）"><svg><use href="#i-undo"/></svg><span>戻す</span></button>
@@ -504,7 +507,7 @@ const S = { src:null, name:'', kind:'image', pxPerMm0:null, imgScale:1, pdf:null
   lines:[], sel:-1, asIs:false, anns:[], hist:[], tool:'line', pending:null, hover:null, measure:null, stroke:null,
   view:{k:1,ox:0,oy:0}, mode:'u', color:'red', size:'m', ortho:false, penSeen:false,
   fmt:'pdf', withAnns:false, editing:undefined, textAt:null, textSize:20, loadNote:'',
-  phase:'start', future:[], penOnly:false, pdfPage:null, pdfBytes:null, srcScale:1, rot:0, hi:null, hiTask:null, srcGen:0, pageHasAnnots:false };
+  phase:'start', selAnn:-1, future:[], penOnly:false, pdfPage:null, pdfBytes:null, srcScale:1, rot:0, hi:null, hiTask:null, srcGen:0, pageHasAnnots:false };
 
 const cv = $('#cv'), ctx = cv.getContext('2d'), stage = $('#stage');
 let dpr = 1;
@@ -648,6 +651,11 @@ function paint(){
       handles:S.tool==='line', strong:i===S.sel, alpha:S.tool==='line' ? 1 : .5});
   });
   renderAnns(ctx, px, c, S.tool==='measure', S.editing);
+  if(S.tool==='select' && S.anns[S.selAnn]){
+    const bb = annBox(S.anns[S.selAnn], px);
+    ctx.save(); ctx.strokeStyle = css('--accent'); ctx.lineWidth = px(1.5); ctx.setLineDash([px(5),px(4)]);
+    ctx.strokeRect(bb.x, bb.y, bb.w, bb.h); ctx.restore();
+  }
   if(S.stroke) drawPen(ctx, S.stroke);
   if(S.measure){
     drawDim(ctx, S.measure.a, S.measure.b, {color:mark2, label: c ? '実長 '+fmt(realLen(S.measure.a,S.measure.b,c))+' mm' : '縮尺が未設定です', px, handles:true, strong:true});
@@ -748,9 +756,24 @@ function hitDimBody(p){
 
 /* ---------- history ---------- */
 function pushHist(){ S.hist.push(JSON.stringify(S.anns)); if(S.hist.length>80) S.hist.shift(); S.future = []; }
+function shiftAnn(o, dx, dy){
+  const a = JSON.parse(JSON.stringify(o)), mv = p => ({x:p.x+dx, y:p.y+dy});
+  if(a.type==='dim'){ a.a = mv(a.a); a.b = mv(a.b); }
+  else if(a.type==='pen') a.pts = a.pts.map(mv);
+  else if(a.type==='text') a.p = mv(a.p);
+  return a;
+}
+function annBox(a, px){
+  let xs, ys, pad = px(8);
+  if(a.type==='text'){ const b = textBox(a); return {x:b.x-pad, y:b.y-pad, w:b.w+pad*2, h:b.h+pad*2}; }
+  if(a.type==='dim'){ xs = [a.a.x, a.b.x]; ys = [a.a.y, a.b.y]; pad = px(26); }
+  else { xs = a.pts.map(p => p.x); ys = a.pts.map(p => p.y); pad += a.w/2; }
+  const x0 = Math.min(...xs), y0 = Math.min(...ys);
+  return {x:x0-pad, y:y0-pad, w:Math.max(...xs)-x0+pad*2, h:Math.max(...ys)-y0+pad*2};
+}
 function undo(){ if(!S.hist.length) return; commitText(true); S.future.push(JSON.stringify(S.anns)); S.anns = JSON.parse(S.hist.pop()); annsChanged(); }
 function redo(){ if(!S.future.length) return; commitText(true); S.hist.push(JSON.stringify(S.anns)); S.anns = JSON.parse(S.future.pop()); annsChanged(); }
-function annsChanged(){ draw(); updateDerived(); }
+function annsChanged(){ if(!S.anns[S.selAnn]) S.selAnn = -1; draw(); updateDerived(); }
 
 /* ---------- pointer ---------- */
 let drag = null, shiftDown = false, spaceDown = false;
@@ -792,6 +815,20 @@ cv.addEventListener('pointerdown', e => {
     S.stroke = {type:'pen', pts:[sp], color:COLORS[S.color], w:PEN_MM[S.size]/mmpp()};
     drag = {type:'pen', last:p}; draw(); return;
   }
+  if(S.tool==='select' || S.tool==='text'){
+    if(S.tool==='select') commitText();
+    const idx = hitAnn(sp), a = S.anns[idx];
+    if(idx >= 0 && (S.tool==='select' || (a.type==='text' && idx !== S.editing))){
+      commitText();
+      const j = S.anns.indexOf(a);               // index can shift if committing removed an empty text
+      if(j >= 0){
+        if(S.tool==='select') S.selAnn = j;
+        drag = {type:'grab', idx:j, s0:sp, sp:p, orig:JSON.parse(JSON.stringify(a)), moved:false};
+        draw(); return;
+      }
+    }
+    if(S.tool==='select'){ S.selAnn = -1; drag = {type:'pan', x:p.x, y:p.y, ox:S.view.ox, oy:S.view.oy}; draw(); return; }
+  }
   if(S.tool==='text'){ drag = {type:'tap', sp:p}; return; }
   if(S.tool==='erase'){ drag = {type:'erase', pushed:false}; eraseAt(sp); return; }
 });
@@ -802,6 +839,8 @@ cv.addEventListener('pointermove', e => {
   if(!drag){
     cv.style.cursor = S.tool==='pan'||spaceDown ? 'grab'
       : S.tool==='erase' ? (hitAnn(S.hover)>=0 ? 'pointer' : 'default')
+      : S.tool==='select' ? (hitAnn(S.hover)>=0 ? 'grab' : 'default')
+      : (S.tool==='text' && hitAnn(S.hover)>=0 && S.anns[hitAnn(S.hover)].type==='text') ? 'move'
       : hitEnd(p) ? 'move' : (S.tool==='measure' && hitDimBody(p)) ? 'grab' : (S.tool==='text' ? 'text' : 'crosshair');
     if(S.pending) draw();
     return;
@@ -818,6 +857,14 @@ cv.addEventListener('pointermove', e => {
     const other = drag.line[drag.key==='a'?'b':'a'];
     drag.line[drag.key] = snap(other, toSrc(p), e.shiftKey||S.ortho);
     draw(); if(drag.kind==='cal') updateDerived(); if(drag.kind==='tmp') updateMeasureBar(); return;
+  }
+  if(drag.type==='grab'){
+    if(!drag.moved){ if(Math.hypot(p.x-drag.sp.x, p.y-drag.sp.y) < 6) return; drag.moved = true; pushHist(); }
+    const q = toSrc(p);
+    let dx = q.x-drag.s0.x, dy = q.y-drag.s0.y;
+    if(e.shiftKey||S.ortho){ if(Math.abs(dx) >= Math.abs(dy)) dy = 0; else dx = 0; }
+    S.anns[drag.idx] = shiftAnn(drag.orig, dx, dy);
+    cv.style.cursor = 'grabbing'; draw(); return;
   }
   if(drag.type==='move'){
     const q = toSrc(p);
@@ -860,6 +907,10 @@ function endPointer(e){
   }
   if(drag.type==='end'){ if(drag.kind==='cal') renderList(); if(drag.kind==='ann') annsChanged(); }
   if(drag.type==='move'){ if(drag.kind==='ann') annsChanged(); else updateMeasureBar(); }
+  if(drag.type==='grab'){
+    if(drag.moved) annsChanged();
+    else if(S.tool==='text') openText(null, drag.idx);
+  }
   drag = null; draw();
 }
 cv.addEventListener('pointerup', endPointer);
@@ -965,13 +1016,14 @@ function setTipDefault(){
     line: COARSE ? '寸法合わせ：寸法を端から端までなぞる（なぞると自動で「移動」に戻ります）' : '縮尺合わせ：寸法の始点をクリック（ドラッグでも可）・右ドラッグで画面移動',
     measure: COARSE ? '計測：2点をなぞる／寸法の線や数字をつかんで移動' : '計測：2点をクリックまたはドラッグ／寸法の線や数字をドラッグで移動・端点で長さ調整',
     pen: 'ペン：なぞって書き込み' + (S.penOnly ? '（指は画面の移動・拡大）' : ''),
-    text: '文字：書き込みたい場所をタップ（既存の文字をタップで修正）',
-    erase: '消す：消したい書き込みをタップ、またはなぞる',
+    text: '文字：書き込みたい場所をタップ（文字をタップで修正、ドラッグで移動）',
+    erase: '消しゴム：消したい書き込みをタップ、またはなぞる',
+    select: '動かす：寸法・文字・ペンの書き込みをつかんでドラッグ（何もない所をドラッグすると画面移動）',
     pan: COARSE ? (S.phase==='scale' ? '指で移動・2本指で拡大／「寸法合わせ」を押してから寸法をなぞる' : '指で移動・2本指で拡大／使いたい道具を上から選ぶ') : 'ドラッグで移動・ホイールで拡大縮小'
   };
   setTip(t[S.tool]);
 }
-const PHASE_TOOLS = {scale:['line','pan'], work:['measure','pen','text','erase','pan']};
+const PHASE_TOOLS = {scale:['line','pan'], work:['measure','pen','text','erase','select','pan']};
 function setTool(t){
   if(PHASE_TOOLS[S.phase] && !PHASE_TOOLS[S.phase].includes(t)) return;
   commitText();
@@ -1024,8 +1076,9 @@ window.addEventListener('keydown', e => {
   if(e.key==='Delete'||e.key==='Backspace'){
     if(S.tool==='measure' && S.measure){ S.measure=null; updateMeasureBar(); draw(); }
     else if(S.tool==='line' && S.sel>=0){ S.lines.splice(S.sel,1); S.sel=-1; renderList(); draw(); }
+    else if(S.tool==='select' && S.anns[S.selAnn]){ pushHist(); S.anns.splice(S.selAnn,1); S.selAnn=-1; annsChanged(); }
   }
-  const map = {l:'line', m:'measure', p:'pen', t:'text', e:'erase', h:'pan'};
+  const map = {l:'line', m:'measure', p:'pen', t:'text', e:'erase', v:'select', h:'pan'};
   const k = e.key.toLowerCase();
   if(!e.metaKey && !e.ctrlKey && !e.altKey && map[k]) setTool(map[k]);
 });
