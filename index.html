@@ -175,6 +175,15 @@ button.big{padding:13px 16px;font-size:15px}
 .tb.opts>button{min-height:44px;padding:6px 14px}
 .tb.opts .grp{padding:6px 12px}
 .tb .sw{width:30px;height:30px}
+.szlbl{font-size:12px;color:var(--muted);white-space:nowrap}
+.tb .szb{width:34px;height:34px;padding:0;border:1px solid var(--rule)!important;border-radius:8px;font-size:18px;line-height:1;background:var(--bg)}
+#sizeVal{width:72px;min-height:34px;padding:4px 6px;text-align:right;font-size:15px}
+.szunit{font-size:12px;color:var(--muted)}
+.dimed{position:absolute;z-index:5;display:flex;align-items:center;gap:6px;background:var(--panel);border:2px solid var(--mark);border-radius:10px;padding:6px 8px;box-shadow:0 6px 20px rgba(0,0,0,.2)}
+.dimed label{font-size:12px;color:var(--muted);white-space:nowrap}
+.dimed input{width:110px;font-size:18px;font-family:var(--f-num);text-align:right;padding:4px 8px;min-height:36px}
+.dimed span{font-size:12px;color:var(--muted)}
+.dimed button{padding:6px 12px}
 button,a,input,select,.bigdrop{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .tenkey.left{right:auto;left:max(16px,env(safe-area-inset-left,0px))}
 .stage,.tenkey,.toolbar{-webkit-touch-callout:none}
@@ -244,6 +253,8 @@ input.tk-active{outline:2px solid var(--accent);outline-offset:1px}
   .tb.opts>button{min-height:38px;padding:4px 10px;font-size:12px}
   .tb.opts .grp{padding:4px 8px;gap:6px}
   .tb .sw{width:26px;height:26px}
+  .szlbl{display:none}
+  #sizeVal{width:60px}
   .status{left:8px;right:8px;bottom:8px}
   .status #tip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 64px)}
   .mbar{bottom:44px}
@@ -463,12 +474,11 @@ input.tk-active{outline:2px solid var(--accent);outline-offset:1px}
             <button type="button" class="sw" data-c="green" aria-label="緑" aria-pressed="false" style="background:#2c8a3e"></button>
           </div>
           <div class="grp" id="optSize">
-            <div class="seg" role="group" aria-label="太さ・大きさ" id="sizeSeg">
-              <button type="button" data-v="s" aria-pressed="false">細</button>
-              <button type="button" data-v="m" aria-pressed="true">中</button>
-              <button type="button" data-v="l" aria-pressed="false">太</button>
-              <button type="button" data-v="xl" aria-pressed="false">特大</button>
-            </div>
+            <span class="szlbl" id="sizeLbl">文字サイズ</span>
+            <button type="button" class="szb" data-d="-1" aria-label="小さく">−</button>
+            <input type="number" id="sizeVal" min="0.1" max="200" step="0.5" value="5" aria-label="サイズ（mm）">
+            <button type="button" class="szb" data-d="1" aria-label="大きく">＋</button>
+            <span class="szunit">mm</span>
           </div>
           <button type="button" class="toggle" id="orthoBtn" aria-pressed="false" title="水平・垂直に固定（Shiftでも可）">水平・垂直に固定</button>
           <button type="button" class="toggle" id="penOnlyBtn" aria-pressed="false" title="Apple Pencilだけで描き、指は画面の移動・拡大に使う">ペンだけで描く</button>
@@ -480,6 +490,12 @@ input.tk-active{outline:2px solid var(--accent);outline-offset:1px}
       <span class="val" id="mval"></span>
       <button type="button" class="primary" id="mKeep">図面に残す</button>
       <button type="button" id="mClear">消す</button>
+    </div>
+    <div class="dimed" id="dimEd" hidden>
+      <label for="dimEdIn" id="dimEdLbl">① の実寸</label>
+      <input type="number" id="dimEdIn" step="any" min="0" inputmode="decimal" placeholder="例 3640">
+      <span>mm</span>
+      <button type="button" class="primary" id="dimEdOk">確定</button>
     </div>
     <input type="text" class="texted" id="textEd" hidden enterkeyhint="done" aria-label="書き込む文字">
     <div class="status"><span id="tip">寸法の始点をクリック</span><span class="num" id="zoomLbl">100%</span></div>
@@ -512,14 +528,14 @@ const $ = s => document.querySelector(s);
 const PAPERS = {A4:[210,297],A3:[297,420],A2:[420,594],A1:[594,841],B4:[257,364],B3:[364,515]};
 const MAXSIDE = 8192, MAXAREA = 15e6;   // iPad Safari refuses canvases above ~16.7M px
 const COLORS = {red:'#d7263d', blue:'#1f6fd1', black:'#1c1c1c', green:'#2c8a3e'};
-const PEN_MM = {s:0.35, m:0.7, l:1.4, xl:2.4}, TEXT_MM = {s:3.5, m:5, l:8, xl:12};
+const SIZE_DEFAULT = {text:5, pen:0.7, dim:3};   // paper millimetres: text height, pen width, dimension figure height
 const EXPORT_MM_PER_PX = 0.22;   // 1 on-screen px of a dimension mark ≈ 0.22 mm on paper
 const COARSE = matchMedia('(pointer:coarse)').matches;
 const S = { src:null, name:'', kind:'image', pxPerMm0:null, imgScale:1, pdf:null, page:1, pageState:{},
   lines:[], sel:-1, asIs:false, anns:[], hist:[], tool:'line', pending:null, hover:null, measure:null, stroke:null,
   view:{k:1,ox:0,oy:0}, mode:'u', color:'red', size:'m', ortho:false, penSeen:false,
   fmt:'pdf', withAnns:false, editing:undefined, textAt:null, textSize:20, loadNote:'',
-  phase:'start', selAnn:-1, future:[], penOnly:false, pdfPage:null, pdfBytes:null, srcScale:1, rot:0, hi:null, hiTask:null, srcGen:0, pageHasAnnots:false };
+  phase:'start', selAnn:-1, mm:{...SIZE_DEFAULT}, styleHist:false, future:[], penOnly:false, pdfPage:null, pdfBytes:null, srcScale:1, rot:0, hi:null, hiTask:null, srcGen:0, pageHasAnnots:false };
 
 const cv = $('#cv'), ctx = cv.getContext('2d'), stage = $('#stage');
 let dpr = 1;
@@ -591,11 +607,11 @@ function fit(){
   S.view.k = k;
   S.view.ox = (r.width - S.src.width*k)/2;
   S.view.oy = top + (r.height-top-bottom - S.src.height*k)/2;
-  draw(); placeTextEd();
+  draw(); placeTextEd(); placeDimEd();
 }
 function zoomAt(f, px, py){
   const v = S.view, nk = Math.min(40, Math.max(0.02, v.k*f));
-  v.ox = px - (px - v.ox)*nk/v.k; v.oy = py - (py - v.oy)*nk/v.k; v.k = nk; draw(); placeTextEd();
+  v.ox = px - (px - v.ox)*nk/v.k; v.oy = py - (py - v.oy)*nk/v.k; v.k = nk; draw(); placeTextEd(); placeDimEd();
 }
 const toSrc = p => ({x:(p.x-S.view.ox)/S.view.k, y:(p.y-S.view.oy)/S.view.k});
 const toScr = p => ({x:p.x*S.view.k+S.view.ox, y:p.y*S.view.k+S.view.oy});
@@ -636,7 +652,10 @@ function drawText(g, t){
 function renderAnns(g, px, c, handles, skip){
   S.anns.forEach((a,i) => {
     if(i===skip) return;
-    if(a.type==='dim') drawDim(g, a.a, a.b, {color:a.color, label: c ? fmt(realLen(a.a,a.b,c)) : '縮尺未設定', px, handles});
+    if(a.type==='dim'){
+      const fs = a.fs || S.mm.dim/mmpp(c), dpx = n => n*fs/12.5;   // whole mark follows its figure height
+      drawDim(g, a.a, a.b, {color:a.color, label: c ? fmt(realLen(a.a,a.b,c)) : '縮尺未設定', px:dpx, handles});
+    }
     else if(a.type==='pen') drawPen(g, a);
     else if(a.type==='text') drawText(g, a);
   });
@@ -785,7 +804,7 @@ function annBox(a, px){
 }
 function undo(){ if(!S.hist.length) return; commitText(true); S.future.push(JSON.stringify(S.anns)); S.anns = JSON.parse(S.hist.pop()); annsChanged(); }
 function redo(){ if(!S.future.length) return; commitText(true); S.hist.push(JSON.stringify(S.anns)); S.anns = JSON.parse(S.future.pop()); annsChanged(); }
-function annsChanged(){ if(!S.anns[S.selAnn]) S.selAnn = -1; draw(); updateDerived(); }
+function annsChanged(){ if(!S.anns[S.selAnn]) S.selAnn = -1; draw(); updateDerived(); syncSizeUi(); }
 
 /* ---------- pointer ---------- */
 let drag = null, shiftDown = false, spaceDown = false;
@@ -798,6 +817,7 @@ function snap(a, b, on){
 const DRAW_TOOLS = ['line','measure','pen','text','erase'];
 cv.addEventListener('pointerdown', e => {
   if(!S.src) return;
+  if(!dimEd.hidden && e.button===0 && S.tool!=='pan' && !spaceDown) closeDimEd();
   cv.setPointerCapture(e.pointerId);
   const p = local(e); pts.set(e.pointerId, p);
   if(e.pointerType==='pen' && !S.penSeen){ S.penSeen = true; setPenOnly(true); }
@@ -824,7 +844,7 @@ cv.addEventListener('pointerdown', e => {
     drag = {type:'draw', start:sp, sp:p, moved:false}; return;
   }
   if(S.tool==='pen'){
-    S.stroke = {type:'pen', pts:[sp], color:COLORS[S.color], w:PEN_MM[S.size]/mmpp()};
+    S.stroke = {type:'pen', pts:[sp], color:COLORS[S.color], w:S.mm.pen/mmpp()};
     drag = {type:'pen', last:p}; draw(); return;
   }
   if(S.tool==='select' || S.tool==='text'){
@@ -836,15 +856,14 @@ cv.addEventListener('pointerdown', e => {
       if(j >= 0){
         if(S.tool==='select'){
           S.selAnn = j;
-          const tbl = a.type==='text' ? TEXT_MM : PEN_MM;
-          sizeLabels(a.type==='text' ? 'text' : 'pen');
-          markStyle(colorKey(a.color), a.type==='dim' ? null : nearestSize(tbl, (a.type==='text' ? a.size : a.w)*mmpp()));
+          S.styleHist = false;
+          markStyle(colorKey(a.color)); syncSizeUi();
         }
         drag = {type:'grab', idx:j, s0:sp, sp:p, orig:JSON.parse(JSON.stringify(a)), moved:false};
         draw(); return;
       }
     }
-    if(S.tool==='select'){ S.selAnn = -1; drag = {type:'pan', x:p.x, y:p.y, ox:S.view.ox, oy:S.view.oy}; draw(); return; }
+    if(S.tool==='select'){ S.selAnn = -1; syncSizeUi(); drag = {type:'pan', x:p.x, y:p.y, ox:S.view.ox, oy:S.view.oy}; draw(); return; }
   }
   if(S.tool==='text'){ drag = {type:'tap', sp:p}; return; }
   if(S.tool==='erase'){ drag = {type:'erase', pushed:false}; eraseAt(sp); return; }
@@ -869,7 +888,7 @@ cv.addEventListener('pointermove', e => {
     S.view.ox += cx-drag.cx; S.view.oy += cy-drag.cy;
     zoomAt(d/drag.d, cx, cy); drag.d=d; drag.cx=cx; drag.cy=cy; return;
   }
-  if(drag.type==='pan'){ S.view.ox = drag.ox + p.x-drag.x; S.view.oy = drag.oy + p.y-drag.y; cv.style.cursor='grabbing'; draw(); placeTextEd(); return; }
+  if(drag.type==='pan'){ S.view.ox = drag.ox + p.x-drag.x; S.view.oy = drag.oy + p.y-drag.y; cv.style.cursor='grabbing'; draw(); placeTextEd(); placeDimEd(); return; }
   if(drag.type==='end'){
     const other = drag.line[drag.key==='a'?'b':'a'];
     drag.line[drag.key] = snap(other, toSrc(p), e.shiftKey||S.ortho);
@@ -951,8 +970,42 @@ function finish(a, b){
   renderList();
   if(finger) setTool('pan'); else setTipDefault();
   const inp = document.getElementById('real-'+S.sel);
-  if(inp){ inp.inputMode = 'none'; tkOpen(inp); keepAbovePad({x:(a.x+b.x)/2, y:(a.y+b.y)/2}); }
+  if(inp){
+    if(lastPT === 'mouse') openDimEd(S.sel);
+    else { inp.inputMode = 'none'; tkOpen(inp); keepAbovePad({x:(a.x+b.x)/2, y:(a.y+b.y)/2}); }
+  }
 }
+const dimEd = $('#dimEd'), dimEdIn = $('#dimEdIn');
+let dimEdIdx = -1;
+function openDimEd(i){
+  const l = S.lines[i]; if(!l) return;
+  dimEdIdx = i;
+  $('#dimEdLbl').textContent = `${circ(i)} の実寸`;
+  dimEdIn.value = l.real > 0 ? l.real : '';
+  dimEd.hidden = false; placeDimEd();
+  dimEdIn.focus(); dimEdIn.select();
+}
+function placeDimEd(){
+  if(dimEd.hidden) return;
+  const l = S.lines[dimEdIdx]; if(!l){ closeDimEd(); return; }
+  const st = stage.getBoundingClientRect(), P = toScr({x:(l.a.x+l.b.x)/2, y:(l.a.y+l.b.y)/2});
+  const w = dimEd.offsetWidth, h = dimEd.offsetHeight;
+  dimEd.style.left = Math.max(8, Math.min(st.width - w - 8, P.x - w/2)) + 'px';
+  dimEd.style.top = Math.max(8, Math.min(st.height - h - 50, P.y + 34)) + 'px';
+}
+function closeDimEd(){ dimEd.hidden = true; dimEdIdx = -1; }
+dimEdIn.addEventListener('input', () => {
+  const l = S.lines[dimEdIdx]; if(!l) return;
+  l.real = parseFloat(dimEdIn.value) || null;
+  const li = document.getElementById('real-'+dimEdIdx); if(li) li.value = dimEdIn.value;
+  updateDerived(); draw();
+});
+dimEdIn.addEventListener('keydown', e => {
+  if(e.key==='Enter' && !e.isComposing){ e.preventDefault(); closeDimEd(); }
+  if(e.key==='Escape'){ e.preventDefault(); closeDimEd(); }
+  e.stopPropagation();
+});
+$('#dimEdOk').onclick = closeDimEd;
 // slide the drawing up so the point stays visible above the on-screen tenkey
 function keepAbovePad(sp){
   if(TK.el.hidden) return;
@@ -973,7 +1026,7 @@ function updateMeasureBar(){
 }
 $('#mKeep').onclick = () => {
   if(!S.measure) return;
-  pushHist(); S.anns.push({type:'dim', a:S.measure.a, b:S.measure.b, color:COLORS[S.color]});
+  pushHist(); S.anns.push({type:'dim', a:S.measure.a, b:S.measure.b, color:COLORS[S.color], fs:S.mm.dim/mmpp()});
   S.measure = null; annsChanged();
 };
 $('#mClear').onclick = () => { S.measure = null; updateMeasureBar(); draw(); };
@@ -985,11 +1038,12 @@ function openText(sp, idx){
   const ex = idx >= 0 ? S.anns[idx] : null;
   S.editing = ex ? idx : undefined;
   S.textAt = ex ? {...ex.p} : sp;
-  S.textSize = ex ? ex.size : TEXT_MM[S.size]/mmpp();
+  S.textSize = ex ? ex.size : S.mm.text/mmpp();
   ted.value = ex ? ex.text : '';
   S.textColor = ex ? ex.color : COLORS[S.color];
   ted.style.color = S.textColor;
-  if(ex){ markStyle(colorKey(ex.color), nearestSize(TEXT_MM, ex.size*mmpp())); }
+  if(ex) markStyle(colorKey(ex.color));
+  syncSizeUi();
   ted.hidden = false; placeTextEd(); draw();
   if(lastPT === 'mouse'){ ted.inputMode = 'text'; ted.focus(); }
   else { ted.inputMode = 'none'; tkOpen(ted); }
@@ -1049,39 +1103,68 @@ function setTool(t){
   S.tool = t; S.pending = null;
   document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool===t));
   $('#optColor').hidden = !['measure','pen','text','select'].includes(t);
-  $('#optSize').hidden = !['pen','text','select'].includes(t);
-  sizeLabels(t==='text' ? 'text' : 'pen');
+  syncSizeUi();
   $('#orthoBtn').hidden = !['line','measure'].includes(t);
   $('#penOnlyBtn').hidden = !(COARSE || S.penSeen) || !DRAW_TOOLS.includes(t);
   $('#optBar').hidden = !['line','measure','pen','text','select'].includes(t) && $('#penOnlyBtn').hidden;
   setTipDefault(); draw();
 }
 document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
-function sizeLabels(kind){
-  const L = kind==='text' ? {s:'小', m:'中', l:'大', xl:'特大'} : {s:'細', m:'中', l:'太', xl:'極太'};
-  document.querySelectorAll('#sizeSeg button').forEach(b => b.textContent = L[b.dataset.v]);
-}
-function markStyle(color, size){
+function markStyle(color){
   if(color) document.querySelectorAll('#optColor .sw').forEach(x => x.setAttribute('aria-pressed', x.dataset.c===color));
-  if(size) document.querySelectorAll('#sizeSeg button').forEach(x => x.setAttribute('aria-pressed', x.dataset.v===size));
 }
 const colorKey = hex => Object.keys(COLORS).find(k => COLORS[k]===hex);
-function nearestSize(table, mm){ return Object.keys(table).reduce((a,b) => Math.abs(table[b]-mm) < Math.abs(table[a]-mm) ? b : a); }
-// change the style of the selected writing (動かす) or of the text being typed (文字)
-function restyle(kind, v){
+// which size the number box edits right now
+function sizeKind(){
+  if(S.tool==='text') return 'text';
+  if(S.tool==='pen') return 'pen';
+  if(S.tool==='measure') return 'dim';
+  if(S.tool==='select'){ const a = S.anns[S.selAnn]; return a ? a.type : null; }
+  return null;
+}
+const SIZE_LABEL = {text:'文字サイズ', pen:'線の太さ', dim:'寸法の文字'};
+function currentMM(kind){
   const m = mmpp();
-  if(!ted.hidden){
-    if(kind==='color'){ S.textColor = COLORS[v]; ted.style.color = S.textColor; }
-    else { S.textSize = TEXT_MM[v]/m; placeTextEd(); }
-    return;
+  if(kind==='text' && !ted.hidden) return S.textSize*m;
+  if(S.tool==='select'){
+    const a = S.anns[S.selAnn];
+    if(a){ if(a.type==='text') return a.size*m; if(a.type==='pen') return a.w*m; if(a.type==='dim') return (a.fs || S.mm.dim/m)*m; }
   }
+  return S.mm[kind];
+}
+function syncSizeUi(){
+  const k = sizeKind(), box = $('#optSize');
+  box.hidden = !k; if(!k) return;
+  $('#sizeLbl').textContent = SIZE_LABEL[k];
+  const inp = $('#sizeVal');
+  inp.step = k==='pen' ? '0.1' : '0.5';
+  if(document.activeElement !== inp && TK.target !== inp) inp.value = +currentMM(k).toFixed(2);
+}
+// apply a size (paper mm) to what is being drawn, typed or selected
+function setSizeMM(mm){
+  const k = sizeKind(); if(!k || !(mm > 0)) return;
+  mm = Math.min(200, Math.max(0.1, mm));
+  const m = mmpp();
+  if(S.tool !== 'select') S.mm[k] = mm;
+  if(k==='text' && !ted.hidden){ S.textSize = mm/m; placeTextEd(); return; }
   const a = S.tool==='select' ? S.anns[S.selAnn] : null;
   if(!a) return;
-  pushHist();
-  if(kind==='color') a.color = COLORS[v];
-  else if(a.type==='text') a.size = TEXT_MM[v]/m;
-  else if(a.type==='pen') a.w = PEN_MM[v]/m;
-  annsChanged();
+  if(!S.styleHist){ pushHist(); S.styleHist = true; }
+  if(a.type==='text') a.size = mm/m; else if(a.type==='pen') a.w = mm/m; else if(a.type==='dim') a.fs = mm/m;
+  draw(); updateCounts();
+}
+$('#sizeVal').addEventListener('input', e => setSizeMM(parseFloat(e.target.value)));
+document.querySelectorAll('#optSize .szb').forEach(b => b.addEventListener('click', () => {
+  const inp = $('#sizeVal'), st = parseFloat(inp.step) || 0.5;
+  const v = Math.max(st, Math.round(((parseFloat(inp.value) || 0) + st*b.dataset.d)/st)*st);
+  inp.value = +v.toFixed(2); setSizeMM(v);
+}));
+// change the colour of the selected writing (動かす) or of the text being typed (文字)
+function restyle(kind, v){
+  if(!ted.hidden){ S.textColor = COLORS[v]; ted.style.color = S.textColor; return; }
+  const a = S.tool==='select' ? S.anns[S.selAnn] : null;
+  if(!a) return;
+  pushHist(); a.color = COLORS[v]; annsChanged();
 }
 document.querySelectorAll('#optColor .sw').forEach(b => b.addEventListener('click', () => {
   S.color = b.dataset.c; markStyle(S.color); restyle('color', S.color);
@@ -1092,7 +1175,6 @@ function segGroup(sel, fn){
     g.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x===b)); fn(b.dataset.v);
   }));
 }
-segGroup('#sizeSeg', v => { S.size = v; restyle('size', v); });
 segGroup('#modeSeg', v => { S.mode = v; renderList(); draw(); });
 segGroup('#fmtSeg', v => { S.fmt = v; $('#exportBtn').textContent = v==='png' ? 'PNGを書き出す' : 'PDFを書き出す'; updateDerived(); });
 segGroup('#annSeg', v => { S.withAnns = v==='1'; updateDerived(); });
@@ -1611,6 +1693,7 @@ const TK = {el:$('#tenkey'), target:null, mode:'number', buf:'', switching:false
 const TK_LABELS = {ratio:['目標の縮尺 1 /',''], offX:['位置ずらし 横','mm'], offY:['位置ずらし 縦','mm'], dpi:['スキャン解像度','dpi']};
 function tkLabelFor(inp){
   if(inp === ted) return ['書き込む文字（「キーボード」でかな入力）',''];
+  if(inp.id === 'sizeVal') return [$('#sizeLbl').textContent, 'mm'];
   const m = /^real-(\d+)$/.exec(inp.id);
   if(m) return [`${circ(+m[1])} の実寸`,'mm'];
   return TK_LABELS[inp.id] || [inp.getAttribute('aria-label') || '数値を入力',''];
@@ -1675,7 +1758,7 @@ ted.addEventListener('input', () => { if(TK.target === ted) { TK.buf = ted.value
 function setPhase(p){
   if(p !== 'start' && !S.src) p = 'start';
   if(p === 'work' && !calib()) return;
-  commitText(); tkClose();
+  commitText(); tkClose(); closeDimEd();
   S.phase = p; document.body.dataset.phase = p;
   const order = ['start','scale','work'];
   document.querySelectorAll('.steps li').forEach(li => {
