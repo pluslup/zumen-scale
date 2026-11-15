@@ -116,7 +116,7 @@ label.chk{display:flex;gap:8px;align-items:center;font-size:13px}
 .mbar{position:absolute;left:50%;bottom:52px;transform:translateX(-50%);z-index:3;display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--rule);border-radius:12px;padding:8px 10px 8px 16px;box-shadow:0 4px 16px rgba(0,0,0,.18);max-width:calc(100% - 24px);flex-wrap:wrap;justify-content:center}
 .mbar .val{font-family:var(--f-num);font-size:22px;font-weight:600;color:var(--mark2);white-space:nowrap}
 .mbar .val small{font-size:13px;color:var(--muted);font-weight:400;margin-left:4px}
-.texted{position:absolute;z-index:4;width:auto;min-width:160px;max-width:70%;font:700 16px var(--f-body);padding:4px 8px;border:2px solid var(--accent);border-radius:6px;background:var(--panel)}
+.stage .texted{position:absolute;z-index:4;width:auto;min-width:160px;max-width:70%;font:700 16px var(--f-body);padding:4px 8px;border:2px solid var(--accent);border-radius:6px;background:var(--panel)}
 .busy{position:absolute;inset:0;display:grid;place-items:center;z-index:6;background:color-mix(in srgb,var(--desk) 60%,transparent);font-weight:700}
 .dropmask{position:fixed;inset:0;z-index:20;display:grid;place-items:center;pointer-events:none;
   padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
@@ -162,6 +162,49 @@ button.big{padding:13px 16px;font-size:15px}
 .scalecard b{font-size:22px;margin-left:8px}
 .scalecard .lbl{grid-column:1}
 .scalecard button{grid-column:2;grid-row:1 / span 2}
+/* toolbar buttons with icons */
+.tb .tbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:58px;min-height:54px;padding:6px 8px;font-size:11.5px;line-height:1.2}
+.tbtn svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tb .tbtn:disabled{opacity:.35}
+.tb .tbtn[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+.pglbl{display:flex;align-items:center;padding:0 10px;font-weight:700;font-size:15px;color:var(--ink)}
+.tb.opts{align-items:center}
+.tb.opts>button{min-height:44px;padding:6px 14px}
+.tb.opts .grp{padding:6px 12px}
+.tb .sw{width:30px;height:30px}
+button,a,input,select,.bigdrop{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.tenkey.left{right:auto;left:max(16px,env(safe-area-inset-left,0px))}
+.stage,.tenkey,.toolbar{-webkit-touch-callout:none}
+/* tenkey */
+.tenkey{position:fixed;z-index:30;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));width:min(340px,calc(100vw - 32px));
+  background:var(--panel);border:1px solid var(--rule);border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.28);padding:12px;display:flex;flex-direction:column;gap:10px;-webkit-user-select:none;user-select:none}
+.tk-head{display:flex;flex-direction:column;gap:4px}
+.tk-label{font-size:12.5px;color:var(--muted)}
+.tk-disp{display:flex;align-items:baseline;justify-content:flex-end;gap:6px;background:var(--bg);border:1px solid var(--rule);border-radius:10px;padding:8px 12px;min-height:52px}
+.tk-disp output{font-size:28px;font-weight:600;color:var(--ink);word-break:break-all;text-align:right}
+.tk-disp output:empty::before{content:"0";color:var(--muted);opacity:.5}
+.tk-unit{font-size:14px;color:var(--muted)}
+.tk-grid{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:58px;gap:8px}
+.tk-grid button,.tk-extra button{font-family:var(--f-num);font-size:24px;font-weight:600;border-radius:10px;background:var(--bg);border:1px solid var(--rule);padding:0}
+.tk-grid button:active,.tk-extra button:active{background:var(--chip);transform:scale(.97)}
+.tk-grid .fn{font-size:20px;color:var(--muted)}
+.tk-grid .ok{grid-row:span 2;background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-family:var(--f-body);font-size:18px}
+.tk-extra{display:grid;grid-template-columns:repeat(6,1fr);grid-auto-rows:44px;gap:6px}
+.tk-extra button{font-size:17px}
+.tk-extra .tk-kbd{grid-column:span 6;font-family:var(--f-body);font-size:14px;font-weight:500}
+.tenkey.num-mode .tk-extra{display:none}
+input.tk-active{outline:2px solid var(--accent);outline-offset:1px}
+/* touch devices: larger targets and text */
+@media (pointer:coarse){
+  body{font-size:15px}
+  aside button,.mbar button{min-height:44px}
+  .seg button{min-height:40px;padding:6px 14px}
+  input[type=number],input[type=text],select{min-height:44px;font-size:16px}
+  .hint,.howto{font-size:14px}
+  .steps button{padding:8px 10px;font-size:14px}
+  .tb .tbtn{min-width:62px;min-height:58px;font-size:12px}
+  .status span{font-size:13px;padding:5px 10px}
+}
 @media (max-width:820px){
   .app{grid-template-columns:1fr;flex:none}
   .stage{height:68vh;order:-1}
@@ -170,6 +213,25 @@ button.big{padding:13px 16px;font-size:15px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-cal" viewBox="0 0 24 24"><path d="M3.5 15.5l12-12 5 5-12 12z M7.5 11.5l2 2 M10.5 8.5l1.5 1.5 M13.5 5.5l2 2"/></symbol>
+    <symbol id="i-measure" viewBox="0 0 24 24"><path d="M3 12h18 M6.5 8.5L3 12l3.5 3.5 M17.5 8.5L21 12l-3.5 3.5 M3 6v12 M21 6v12"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20l1-4.5L16 4.5 19.5 8 8.5 19z M13.5 7l3.5 3.5"/></symbol>
+    <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6V4.5h14V6 M12 4.5v15 M8.5 19.5h7"/></symbol>
+    <symbol id="i-eraser" viewBox="0 0 24 24"><path d="M9 20h11 M4.5 14.5l9-9 6 6-8.5 8.5H9.5z M9 10l6 6"/></symbol>
+    <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 12V5.5a1.5 1.5 0 013 0V11 M11 10.5V4a1.5 1.5 0 013 0v6.5 M14 10.5V5.5a1.5 1.5 0 013 0V12 M17 11.5V9a1.5 1.5 0 013 0v5a7 7 0 01-7 7h-1a6 6 0 01-5-2.7l-3-4.6a1.5 1.5 0 012.4-1.8L8 14"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 5L4 10l5 5 M4 10h10a5 5 0 010 10h-3"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 5l5 5-5 5 M20 10H10a5 5 0 000 10h3"/></symbol>
+    <symbol id="i-zin" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21 M10.5 7.5v6 M7.5 10.5h6"/></symbol>
+    <symbol id="i-zout" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21 M7.5 10.5h6"/></symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5 M15 4h5v5 M20 15v5h-5 M9 20H4v-5"/></symbol>
+    <symbol id="i-rot" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 11-2.2-5.3 M19.5 4v5h-5"/></symbol>
+    <symbol id="i-wide" viewBox="0 0 24 24"><path d="M3.5 5h17v14h-17z M9 5v14 M13 12h5 M16 9.5l2.5 2.5-2.5 2.5"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  </defs>
+</svg>
 <header>
   <h1>図面スケール合わせ</h1>
   <ol class="steps" aria-label="作業の流れ">
@@ -309,30 +371,33 @@ button.big{padding:13px 16px;font-size:15px}
     <div class="toolbar">
       <div class="tbrow">
         <div class="tb" role="group" aria-label="ツール">
-          <button type="button" class="ph-scale" data-tool="line" aria-pressed="true" title="縮尺合わせの寸法線（L）">合わせ</button>
-          <button type="button" class="ph-work" data-tool="measure" aria-pressed="false" title="計測（M）">計測</button>
-          <button type="button" class="ph-work" data-tool="pen" aria-pressed="false" title="ペン（P）">ペン</button>
-          <button type="button" class="ph-work" data-tool="text" aria-pressed="false" title="文字（T）">文字</button>
-          <button type="button" class="ph-work" data-tool="erase" aria-pressed="false" title="書き込みを消す（E）">消す</button>
-          <button type="button" data-tool="pan" aria-pressed="false" title="移動（右ドラッグ / H / Space押しながら）">移動</button>
+          <button type="button" class="tbtn ph-scale" data-tool="line" aria-pressed="true" title="寸法合わせ（L）"><svg><use href="#i-cal"/></svg><span>寸法合わせ</span></button>
+          <button type="button" class="tbtn ph-work" data-tool="measure" aria-pressed="false" title="計測（M）"><svg><use href="#i-measure"/></svg><span>計測</span></button>
+          <button type="button" class="tbtn ph-work" data-tool="pen" aria-pressed="false" title="ペン（P）"><svg><use href="#i-pen"/></svg><span>ペン</span></button>
+          <button type="button" class="tbtn ph-work" data-tool="text" aria-pressed="false" title="文字（T）"><svg><use href="#i-text"/></svg><span>文字</span></button>
+          <button type="button" class="tbtn ph-work" data-tool="erase" aria-pressed="false" title="消しゴム（E）"><svg><use href="#i-eraser"/></svg><span>消しゴム</span></button>
+          <button type="button" class="tbtn" data-tool="pan" aria-pressed="false" title="移動（右ドラッグ / H / Space）"><svg><use href="#i-hand"/></svg><span>移動</span></button>
+        </div>
+        <div class="tb ph-work" role="group" aria-label="取り消し">
+          <button type="button" class="tbtn" id="undoBtn" title="元に戻す（⌘Z / Ctrl+Z）"><svg><use href="#i-undo"/></svg><span>戻す</span></button>
+          <button type="button" class="tbtn" id="redoBtn" title="やり直し（⇧⌘Z / Ctrl+Y）"><svg><use href="#i-redo"/></svg><span>やり直し</span></button>
         </div>
         <div class="tb" id="pageNav" hidden role="group" aria-label="ページ">
-          <button type="button" id="pgPrev" title="前のページ（PageUp）" aria-label="前のページ">◀</button>
-          <span class="grp num" id="pgLbl" style="color:var(--ink);font-weight:600">1 / 1</span>
-          <button type="button" id="pgNext" title="次のページ（PageDown）" aria-label="次のページ">▶</button>
+          <button type="button" class="tbtn" id="pgPrev" title="前のページ（PageUp）"><svg><use href="#i-prev"/></svg><span>前</span></button>
+          <span class="pglbl num" id="pgLbl">1 / 1</span>
+          <button type="button" class="tbtn" id="pgNext" title="次のページ（PageDown）"><svg><use href="#i-next"/></svg><span>次</span></button>
         </div>
-        <div class="tb ph-work"><button type="button" id="undoBtn" title="元に戻す（Ctrl/⌘+Z）">↶ 戻す</button></div>
         <div class="tb" role="group" aria-label="表示">
-          <button type="button" id="zIn" title="拡大">＋</button>
-          <button type="button" id="zOut" title="縮小">－</button>
-          <button type="button" id="zFit" title="全体表示">全体</button>
-          <button type="button" id="rot" title="90°回転">回転</button>
-          <button type="button" id="panelBtn" aria-pressed="false" title="左のパネルを隠して図面を広く表示">図面を広く</button>
+          <button type="button" class="tbtn" id="zIn" title="拡大"><svg><use href="#i-zin"/></svg><span>拡大</span></button>
+          <button type="button" class="tbtn" id="zOut" title="縮小"><svg><use href="#i-zout"/></svg><span>縮小</span></button>
+          <button type="button" class="tbtn" id="zFit" title="全体を表示"><svg><use href="#i-fit"/></svg><span>全体</span></button>
+          <button type="button" class="tbtn" id="rot" title="90°回転"><svg><use href="#i-rot"/></svg><span>回転</span></button>
+          <button type="button" class="tbtn" id="panelBtn" aria-pressed="false" title="左のパネルを隠して図面を広く表示"><svg><use href="#i-wide"/></svg><span>広く表示</span></button>
         </div>
       </div>
       <div class="tbrow">
-        <div class="tb" id="optBar">
-          <div class="grp" id="optColor" aria-label="色">
+        <div class="tb opts" id="optBar">
+          <div class="grp" id="optColor" role="group" aria-label="色">
             <button type="button" class="sw" data-c="red" aria-label="赤" aria-pressed="true" style="background:#d7263d"></button>
             <button type="button" class="sw" data-c="blue" aria-label="青" aria-pressed="false" style="background:#1f6fd1"></button>
             <button type="button" class="sw" data-c="black" aria-label="黒" aria-pressed="false" style="background:#1c1c1c"></button>
@@ -346,6 +411,7 @@ button.big{padding:13px 16px;font-size:15px}
             </div>
           </div>
           <button type="button" class="toggle" id="orthoBtn" aria-pressed="false" title="水平・垂直に固定（Shiftでも可）">水平・垂直に固定</button>
+          <button type="button" class="toggle" id="penOnlyBtn" aria-pressed="false" title="Apple Pencilだけで描き、指は画面の移動・拡大に使う">ペンだけで描く</button>
         </div>
       </div>
     </div>
@@ -357,6 +423,24 @@ button.big{padding:13px 16px;font-size:15px}
     <input type="text" class="texted" id="textEd" hidden enterkeyhint="done" aria-label="書き込む文字">
     <div class="status"><span id="tip">寸法の始点をクリック</span><span class="num" id="zoomLbl">100%</span></div>
     <div class="busy" id="busy" hidden>読み込み中…</div>
+  </div>
+</div>
+<div class="tenkey" id="tenkey" hidden role="dialog" aria-label="テンキー">
+  <div class="tk-head">
+    <span class="tk-label" id="tkLabel">実寸を入力</span>
+    <div class="tk-disp"><output class="num" id="tkDisp"></output><span class="tk-unit" id="tkUnit">mm</span></div>
+  </div>
+  <div class="tk-extra" id="tkExtra">
+    <button type="button" data-k="-">-</button><button type="button" data-k="×">×</button><button type="button" data-k="φ">φ</button>
+    <button type="button" data-k="@">@</button><button type="button" data-k="R">R</button><button type="button" data-k="mm">mm</button>
+    <button type="button" data-k="(">(</button><button type="button" data-k=")">)</button><button type="button" data-k=" ">空白</button>
+    <button type="button" class="tk-kbd" data-k="kbd">キーボード（かな）</button>
+  </div>
+  <div class="tk-grid">
+    <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button><button type="button" class="fn" data-k="bs" aria-label="1文字消す">⌫</button>
+    <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button><button type="button" class="fn" data-k="clr">C</button>
+    <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button><button type="button" class="ok" data-k="ok">確定</button>
+    <button type="button" data-k="0">0</button><button type="button" data-k="00">00</button><button type="button" data-k=".">.</button>
   </div>
 </div>
 <div class="dropmask" id="dropmask" hidden><div><strong>ドロップして図面を読み込む</strong><span>PDF・JPG・PNG</span></div></div>
@@ -374,7 +458,7 @@ const S = { src:null, name:'', kind:'image', pxPerMm0:null, imgScale:1, pdf:null
   lines:[], sel:-1, asIs:false, anns:[], hist:[], tool:'line', pending:null, hover:null, measure:null, stroke:null,
   view:{k:1,ox:0,oy:0}, mode:'u', color:'red', size:'m', ortho:false, penSeen:false,
   fmt:'pdf', withAnns:false, editing:undefined, textAt:null, textSize:20, loadNote:'',
-  phase:'start', pdfPage:null, pdfBytes:null, srcScale:1, rot:0, hi:null, hiTask:null, srcGen:0, pageHasAnnots:false };
+  phase:'start', future:[], penOnly:false, pdfPage:null, pdfBytes:null, srcScale:1, rot:0, hi:null, hiTask:null, srcGen:0, pageHasAnnots:false };
 
 const cv = $('#cv'), ctx = cv.getContext('2d'), stage = $('#stage');
 let dpr = 1;
@@ -616,8 +700,9 @@ function hitDimBody(p){
 }
 
 /* ---------- history ---------- */
-function pushHist(){ S.hist.push(JSON.stringify(S.anns)); if(S.hist.length>80) S.hist.shift(); }
-function undo(){ if(!S.hist.length) return; commitText(true); S.anns = JSON.parse(S.hist.pop()); annsChanged(); }
+function pushHist(){ S.hist.push(JSON.stringify(S.anns)); if(S.hist.length>80) S.hist.shift(); S.future = []; }
+function undo(){ if(!S.hist.length) return; commitText(true); S.future.push(JSON.stringify(S.anns)); S.anns = JSON.parse(S.hist.pop()); annsChanged(); }
+function redo(){ if(!S.future.length) return; commitText(true); S.hist.push(JSON.stringify(S.anns)); S.anns = JSON.parse(S.future.pop()); annsChanged(); }
 function annsChanged(){ draw(); updateDerived(); }
 
 /* ---------- pointer ---------- */
@@ -633,7 +718,7 @@ cv.addEventListener('pointerdown', e => {
   if(!S.src) return;
   cv.setPointerCapture(e.pointerId);
   const p = local(e); pts.set(e.pointerId, p);
-  if(e.pointerType==='pen' && !S.penSeen){ S.penSeen = true; setTipDefault(); }
+  if(e.pointerType==='pen' && !S.penSeen){ S.penSeen = true; setPenOnly(true); }
   if(pts.size === 2){
     if(drag && drag.type==='draw' && drag.moved) S.pending = null;
     if(drag && drag.type==='pen') S.stroke = null;
@@ -641,7 +726,7 @@ cv.addEventListener('pointerdown', e => {
     drag = {type:'pinch', d:Math.hypot(p1.x-p2.x,p1.y-p2.y), cx:(p1.x+p2.x)/2, cy:(p1.y+p2.y)/2};
     draw(); return;
   }
-  const fingerPans = e.pointerType==='touch' && S.penSeen && DRAW_TOOLS.includes(S.tool);
+  const fingerPans = e.pointerType==='touch' && S.penOnly && DRAW_TOOLS.includes(S.tool);
   if(S.tool==='pan' || e.button===1 || e.button===2 || spaceDown || fingerPans){
     drag = {type:'pan', x:p.x, y:p.y, ox:S.view.ox, oy:S.view.oy}; return;
   }
@@ -700,7 +785,13 @@ cv.addEventListener('pointermove', e => {
     draw(); return;
   }
   if(drag.type==='pen'){
-    if(Math.hypot(p.x-drag.last.x, p.y-drag.last.y) >= 1.5){ S.stroke.pts.push(toSrc(p)); drag.last = p; draw(); }
+    const evs = (e.getCoalescedEvents && e.getCoalescedEvents().length) ? e.getCoalescedEvents() : [e];
+    let added = false;
+    for(const ev of evs){
+      const q = local(ev);
+      if(Math.hypot(q.x-drag.last.x, q.y-drag.last.y) >= 1){ S.stroke.pts.push(toSrc(q)); drag.last = q; added = true; }
+    }
+    if(added) draw();
     return;
   }
   if(drag.type==='erase'){ eraseAt(toSrc(p)); return; }
@@ -727,6 +818,8 @@ function endPointer(e){
 cv.addEventListener('pointerup', endPointer);
 cv.addEventListener('pointercancel', e => { pts.delete(e.pointerId); if(drag && drag.type==='pen') S.stroke=null; drag=null; draw(); });
 cv.addEventListener('contextmenu', e => e.preventDefault());
+// a tap on the drawing must not steal focus from the field the tenkey is typing into
+cv.addEventListener('mousedown', e => e.preventDefault());
 cv.addEventListener('wheel', e => { e.preventDefault(); const p=local(e); zoomAt(Math.exp(-e.deltaY*0.0015), p.x, p.y); }, {passive:false});
 
 function eraseAt(sp){
@@ -740,7 +833,11 @@ function finish(a, b){
   if(S.tool==='measure'){ S.measure = {a, b}; updateMeasureBar(); setTipDefault(); draw(); return; }
   S.lines.push({a, b, real:null}); S.sel = S.lines.length-1;
   renderList(); setTipDefault();
-  const inp = document.getElementById('real-'+S.sel); if(inp) inp.focus();
+  const inp = document.getElementById('real-'+S.sel);
+  if(inp){
+    if(lastPT === 'mouse') inp.focus();
+    else { inp.inputMode = 'none'; inp.scrollIntoView({block:'nearest'}); tkOpen(inp); }
+  }
 }
 
 /* ---------- measure bar ---------- */
@@ -770,14 +867,22 @@ function openText(sp, idx){
   ted.value = ex ? ex.text : '';
   ted.style.color = ex ? ex.color : COLORS[S.color];
   ted.hidden = false; placeTextEd(); draw();
-  ted.focus();
+  if(lastPT === 'mouse'){ ted.inputMode = 'text'; ted.focus(); }
+  else { ted.inputMode = 'none'; tkOpen(ted); }
 }
 function placeTextEd(){
   if(ted.hidden || !S.textAt) return;
   const P = toScr(S.textAt), fs = Math.max(14, Math.min(48, S.textSize*S.view.k));
   ted.style.left = (P.x-10) + 'px'; ted.style.top = (P.y-6) + 'px'; ted.style.fontSize = fs + 'px';
+  sizeTextEd();
 }
+function sizeTextEd(){
+  mctx.font = `700 ${parseFloat(ted.style.fontSize)||16}px ${FONT()}`;
+  ted.style.width = Math.max(160, mctx.measureText(ted.value || '').width + 40) + 'px';
+}
+ted.addEventListener('input', sizeTextEd);
 function commitText(cancel){
+  if(TK.target === ted) tkClose();
   if(ted.hidden) return;
   const v = ted.value.trim(), idx = S.editing;
   ted.hidden = true;
@@ -794,7 +899,7 @@ ted.addEventListener('keydown', e => {
   if(e.key==='Enter' && !e.isComposing){ e.preventDefault(); commitText(); }
   if(e.key==='Escape'){ commitText(true); }
 });
-ted.addEventListener('blur', () => commitText());
+ted.addEventListener('blur', () => { if(!TK.switching) commitText(); });
 
 /* ---------- tools / keyboard ---------- */
 function setTip(t){ $('#tip').textContent = t; }
@@ -802,7 +907,7 @@ function setTipDefault(){
   const t = {
     line: COARSE ? '縮尺合わせ：図面の寸法を指・ペンでなぞる／2本指で移動・拡大' : '縮尺合わせ：寸法の始点をクリック（ドラッグでも可）・右ドラッグで画面移動',
     measure: COARSE ? '計測：2点をなぞる／寸法の線や数字をつかんで移動・端点で長さ調整' : '計測：2点をクリックまたはドラッグ／寸法の線や数字をドラッグで移動・端点で長さ調整',
-    pen: 'ペン：なぞって書き込み' + (S.penSeen ? '（指は画面移動）' : ''),
+    pen: 'ペン：なぞって書き込み' + (S.penOnly ? '（指は画面の移動・拡大）' : ''),
     text: '文字：書き込みたい場所をタップ（既存の文字をタップで修正）',
     erase: '消す：消したい書き込みをタップ、またはなぞる',
     pan: 'ドラッグで移動・ホイール／2本指で拡大縮小'
@@ -818,7 +923,8 @@ function setTool(t){
   $('#optColor').hidden = !['measure','pen','text'].includes(t);
   $('#optSize').hidden = !['pen','text'].includes(t);
   $('#orthoBtn').hidden = !['line','measure'].includes(t);
-  $('#optBar').hidden = !['line','measure','pen','text'].includes(t);
+  $('#penOnlyBtn').hidden = !(COARSE || S.penSeen) || !DRAW_TOOLS.includes(t);
+  $('#optBar').hidden = !['line','measure','pen','text'].includes(t) && $('#penOnlyBtn').hidden;
   setTipDefault(); draw();
 }
 document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
@@ -835,8 +941,10 @@ segGroup('#sizeSeg', v => { S.size = v; });
 segGroup('#modeSeg', v => { S.mode = v; renderList(); draw(); });
 segGroup('#fmtSeg', v => { S.fmt = v; $('#exportBtn').textContent = v==='png' ? 'PNGを書き出す' : 'PDFを書き出す'; updateDerived(); });
 segGroup('#annSeg', v => { S.withAnns = v==='1'; updateDerived(); });
+function setPenOnly(on){ S.penOnly = on; $('#penOnlyBtn').setAttribute('aria-pressed', on); setTipDefault(); }
+$('#penOnlyBtn').onclick = () => setPenOnly(!S.penOnly);
 $('#orthoBtn').onclick = () => { S.ortho = !S.ortho; $('#orthoBtn').setAttribute('aria-pressed', S.ortho); };
-$('#undoBtn').onclick = undo; $('#undoBtn2').onclick = undo;
+$('#undoBtn').onclick = undo; $('#undoBtn2').onclick = undo; $('#redoBtn').onclick = redo;
 let clearArm = 0;
 $('#clearAnns').onclick = () => {
   const b = $('#clearAnns');
@@ -851,7 +959,8 @@ window.addEventListener('keydown', e => {
   const typing = /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
   if(e.key===' ' && !typing){ spaceDown = true; e.preventDefault(); }
   if(typing) return;
-  if((e.metaKey||e.ctrlKey) && (e.key==='z'||e.key==='Z')){ e.preventDefault(); undo(); return; }
+  if((e.metaKey||e.ctrlKey) && (e.key==='z'||e.key==='Z')){ e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if((e.metaKey||e.ctrlKey) && (e.key==='y'||e.key==='Y')){ e.preventDefault(); redo(); return; }
   if(e.key==='PageDown'){ e.preventDefault(); gotoPage(S.page+1); return; }
   if(e.key==='PageUp'){ e.preventDefault(); gotoPage(S.page-1); return; }
   if(e.key==='Escape'){ S.pending=null; setTipDefault(); draw(); }
@@ -933,6 +1042,7 @@ function updateCounts(){
   const n = t => S.anns.filter(a => a.type===t).length;
   $('#cntDim').textContent = n('dim'); $('#cntPen').textContent = n('pen'); $('#cntText').textContent = n('text');
   $('#undoBtn').disabled = $('#undoBtn2').disabled = !S.hist.length;
+  $('#redoBtn').disabled = !S.future.length;
 }
 
 function outSize(c){ return c ? {W:S.src.width*c.sx, H:S.src.height*c.sy} : null; }
@@ -1322,11 +1432,85 @@ async function deliver(blob, filename){
   };
 }
 
+/* ---------- on-screen tenkey (touch / Apple Pencil) ---------- */
+let lastPT = 'mouse';
+document.addEventListener('pointerdown', e => {
+  lastPT = e.pointerType || 'mouse';
+  const t = e.target, isNum = t.matches && t.matches('input[type=number]');
+  if(isNum) t.inputMode = lastPT === 'mouse' ? 'decimal' : 'none';
+  if(!TK.el.hidden && !TK.el.contains(t) && t !== TK.target){
+    if(TK.mode === 'text') commitText(); else tkClose();
+  }
+  if(isNum && lastPT !== 'mouse'){ e.preventDefault(); tkOpen(t); }
+}, true);
+const TK = {el:$('#tenkey'), target:null, mode:'number', buf:'', switching:false};
+const TK_LABELS = {ratio:['目標の縮尺 1 /',''], offX:['位置ずらし 横','mm'], offY:['位置ずらし 縦','mm'], dpi:['スキャン解像度','dpi']};
+function tkLabelFor(inp){
+  if(inp === ted) return ['書き込む文字（「キーボード」でかな入力）',''];
+  const m = /^real-(\d+)$/.exec(inp.id);
+  if(m) return [`${circ(+m[1])} の実寸`,'mm'];
+  return TK_LABELS[inp.id] || [inp.getAttribute('aria-label') || '数値を入力',''];
+}
+function tkOpen(inp){
+  TK.target = inp; TK.mode = inp === ted ? 'text' : 'number'; TK.buf = inp.value || '';
+  const [lb, un] = tkLabelFor(inp);
+  $('#tkLabel').textContent = lb; $('#tkUnit').textContent = un;
+  TK.el.classList.toggle('num-mode', TK.mode==='number');
+  document.querySelectorAll('input.tk-active').forEach(x => x.classList.remove('tk-active'));
+  inp.classList.add('tk-active');
+  TK.el.hidden = false; tkRender();
+  // keep the text being typed visible: move the pad to the other side if it would cover it
+  const er = inp.getBoundingClientRect(), pr = TK.el.getBoundingClientRect();
+  TK.el.classList.remove('left');
+  if(er.right > pr.left - 8 && er.bottom > pr.top) TK.el.classList.add('left');
+}
+function tkClose(){
+  if(TK.target) TK.target.classList.remove('tk-active');
+  TK.el.hidden = true; TK.target = null;
+}
+function tkRender(){
+  const b = TK.buf;
+  if(TK.mode==='number'){
+    const [i, d] = b.split('.');
+    $('#tkDisp').textContent = (i ? Number(i).toLocaleString('ja-JP') : (d !== undefined ? '0' : '')) + (d !== undefined ? '.' + d : '');
+  } else $('#tkDisp').textContent = b;
+}
+function tkApply(){
+  const t = TK.target; if(!t) return;
+  t.value = TK.mode==='number' ? TK.buf.replace(/\.$/, '') : TK.buf;
+  t.dispatchEvent(new Event('input', {bubbles:true}));
+  tkRender();
+}
+function tkKey(k){
+  const t = TK.target; if(!t) return;
+  if(k === 'ok'){
+    if(TK.mode==='text') commitText(); else { if(document.activeElement === t) t.blur(); tkClose(); }
+    return;
+  }
+  if(k === 'kbd'){ tkClose(); t.inputMode = 'text'; t.focus(); return; }
+  if(k === 'bs') TK.buf = TK.buf.slice(0, -1);
+  else if(k === 'clr') TK.buf = '';
+  else if(TK.mode==='number'){
+    if(k === '.'){ if(!TK.buf.includes('.')) TK.buf = (TK.buf || '0') + '.'; }
+    else if(/^\d+$/.test(k)){ if(TK.buf.replace('.','').length < 9) TK.buf = (TK.buf === '0' ? '' : TK.buf) + k; }
+  } else TK.buf += k;
+  tkApply();
+}
+TK.el.addEventListener('pointerdown', e => e.preventDefault());   // keep focus in the field being edited
+TK.el.addEventListener('mousedown', e => e.preventDefault());
+TK.el.querySelectorAll('button[data-k]').forEach(b => b.addEventListener('click', () => tkKey(b.dataset.k)));
+document.addEventListener('focusin', e => {
+  const t = e.target;
+  if(lastPT === 'mouse' || TK.switching) return;
+  if((t.matches && t.matches('input[type=number]')) || t === ted) tkOpen(t);
+});
+ted.addEventListener('input', () => { if(TK.target === ted) { TK.buf = ted.value; tkRender(); } });
+
 /* ---------- phases ---------- */
 function setPhase(p){
   if(p !== 'start' && !S.src) p = 'start';
   if(p === 'work' && !calib()) return;
-  commitText();
+  commitText(); tkClose();
   S.phase = p; document.body.dataset.phase = p;
   const order = ['start','scale','work'];
   document.querySelectorAll('.steps li').forEach(li => {
