@@ -176,6 +176,8 @@ button.big{padding:13px 16px;font-size:15px}
 .tb.opts .grp{padding:6px 12px}
 .tb .sw{width:30px;height:30px}
 .szlbl{font-size:12px;color:var(--muted);white-space:nowrap}
+.shapeseg button{display:flex;align-items:center;gap:4px;min-height:34px}
+.shapeseg svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .tb .szb{width:34px;height:34px;padding:0;border:1px solid var(--rule)!important;border-radius:8px;font-size:18px;line-height:1;background:var(--bg)}
 #sizeVal{width:72px;min-height:34px;padding:4px 6px;text-align:right;font-size:15px}
 .szunit{font-size:12px;color:var(--muted)}
@@ -292,6 +294,10 @@ input.tk-active{outline:2px solid var(--accent);outline-offset:1px}
     <symbol id="i-move" viewBox="0 0 24 24"><path d="M12 3v18 M3 12h18 M9 6l3-3 3 3 M9 18l3 3 3-3 M6 9l-3 3 3 3 M18 9l3 3-3 3"/></symbol>
     <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 3v11 M7.5 9.5L12 14l4.5-4.5 M4.5 15v4.5h15V15"/></symbol>
     <symbol id="i-panel" viewBox="0 0 24 24"><path d="M4 6h16 M4 12h16 M4 18h16"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></symbol>
+    <symbol id="i-shape" viewBox="0 0 24 24"><circle cx="8.5" cy="8.5" r="5"/><rect x="12" y="12" width="8.5" height="8.5" rx="1"/></symbol>
+    <symbol id="s-ellipse" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="8" ry="6.5"/></symbol>
+    <symbol id="s-rect" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1"/></symbol>
+    <symbol id="s-arrow" viewBox="0 0 24 24"><path d="M4 18L19 5 M12 5h7v7"/></symbol>
     <symbol id="i-prev" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
     <symbol id="i-next" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
   </defs>
@@ -389,9 +395,10 @@ input.tk-active{outline:2px solid var(--accent);outline-offset:1px}
         <li><b>計測</b>：2点をなぞると実寸を表示。「図面に残す」で記入</li>
         <li>残した寸法は、線や数字をつかんで移動、端点で長さ調整</li>
         <li><b>ペン</b>・<b>文字</b>で書き込み、<b>消しゴム</b>で削除</li>
-        <li><b>動かす</b>：寸法・文字・ペンの書き込みをつかんで移動（文字は「文字」のままでもドラッグで移動）</li>
+        <li><b>図形</b>：円・四角形・矢印をドラッグで描く（Shiftで正円・正方形）</li>
+        <li><b>動かす</b>：寸法・文字・ペン・図形をつかんで移動。図形は角の丸で大きさを変更</li>
       </ul>
-      <div class="counts"><span>残した寸法 <b id="cntDim">0</b></span><span>ペン <b id="cntPen">0</b></span><span>文字 <b id="cntText">0</b></span></div>
+      <div class="counts"><span>残した寸法 <b id="cntDim">0</b></span><span>ペン <b id="cntPen">0</b></span><span>文字 <b id="cntText">0</b></span><span>図形 <b id="cntShape">0</b></span></div>
       <div class="row">
         <button type="button" id="undoBtn2">元に戻す</button>
         <button type="button" class="danger" id="clearAnns">書き込みをすべて消す</button>
@@ -443,6 +450,7 @@ input.tk-active{outline:2px solid var(--accent);outline-offset:1px}
           <button type="button" class="tbtn ph-work" data-tool="pen" aria-pressed="false" title="ペン（P）"><svg><use href="#i-pen"/></svg><span>ペン</span></button>
           <button type="button" class="tbtn ph-work" data-tool="text" aria-pressed="false" title="文字（T）"><svg><use href="#i-text"/></svg><span>文字</span></button>
           <button type="button" class="tbtn ph-work" data-tool="erase" aria-pressed="false" title="消しゴム（E）"><svg><use href="#i-eraser"/></svg><span>消しゴム</span></button>
+          <button type="button" class="tbtn ph-work" data-tool="shape" aria-pressed="false" title="図形：円・四角形・矢印（S）"><svg><use href="#i-shape"/></svg><span>図形</span></button>
           <button type="button" class="tbtn ph-work" data-tool="select" aria-pressed="false" title="書き込みを動かす（V）"><svg><use href="#i-move"/></svg><span>動かす</span></button>
           <button type="button" class="tbtn" data-tool="pan" aria-pressed="false" title="画面移動（右ドラッグ / H / Space）"><svg><use href="#i-hand"/></svg><span>画面移動</span></button>
         </div>
@@ -472,6 +480,13 @@ input.tk-active{outline:2px solid var(--accent);outline-offset:1px}
             <button type="button" class="sw" data-c="blue" aria-label="青" aria-pressed="false" style="background:#1f6fd1"></button>
             <button type="button" class="sw" data-c="black" aria-label="黒" aria-pressed="false" style="background:#1c1c1c"></button>
             <button type="button" class="sw" data-c="green" aria-label="緑" aria-pressed="false" style="background:#2c8a3e"></button>
+          </div>
+          <div class="grp" id="optShape">
+            <div class="seg shapeseg" role="group" aria-label="図形の種類" id="shapeSeg">
+              <button type="button" data-v="ellipse" aria-pressed="true"><svg><use href="#s-ellipse"/></svg>円</button>
+              <button type="button" data-v="rect" aria-pressed="false"><svg><use href="#s-rect"/></svg>四角</button>
+              <button type="button" data-v="arrow" aria-pressed="false"><svg><use href="#s-arrow"/></svg>矢印</button>
+            </div>
           </div>
           <div class="grp" id="optSize">
             <span class="szlbl" id="sizeLbl">文字サイズ</span>
@@ -528,14 +543,14 @@ const $ = s => document.querySelector(s);
 const PAPERS = {A4:[210,297],A3:[297,420],A2:[420,594],A1:[594,841],B4:[257,364],B3:[364,515]};
 const MAXSIDE = 8192, MAXAREA = 15e6;   // iPad Safari refuses canvases above ~16.7M px
 const COLORS = {red:'#d7263d', blue:'#1f6fd1', black:'#1c1c1c', green:'#2c8a3e'};
-const SIZE_DEFAULT = {text:5, pen:0.7, dim:3};   // paper millimetres: text height, pen width, dimension figure height
+const SIZE_DEFAULT = {text:5, pen:0.7, dim:3, shape:0.7};   // paper millimetres: text height, pen width, dimension figure height
 const EXPORT_MM_PER_PX = 0.22;   // 1 on-screen px of a dimension mark ≈ 0.22 mm on paper
 const COARSE = matchMedia('(pointer:coarse)').matches;
 const S = { src:null, name:'', kind:'image', pxPerMm0:null, imgScale:1, pdf:null, page:1, pageState:{},
   lines:[], sel:-1, asIs:false, anns:[], hist:[], tool:'line', pending:null, hover:null, measure:null, stroke:null,
   view:{k:1,ox:0,oy:0}, mode:'u', color:'red', size:'m', ortho:false, penSeen:false,
   fmt:'pdf', withAnns:false, editing:undefined, textAt:null, textSize:20, loadNote:'',
-  phase:'start', selAnn:-1, mm:{...SIZE_DEFAULT}, styleHist:false, future:[], penOnly:false, pdfPage:null, pdfBytes:null, srcScale:1, rot:0, hi:null, hiTask:null, srcGen:0, pageHasAnnots:false };
+  phase:'start', shapeKind:'ellipse', shapeDraft:null, selAnn:-1, mm:{...SIZE_DEFAULT}, styleHist:false, future:[], penOnly:false, pdfPage:null, pdfBytes:null, srcScale:1, rot:0, hi:null, hiTask:null, srcGen:0, pageHasAnnots:false };
 
 const cv = $('#cv'), ctx = cv.getContext('2d'), stage = $('#stage');
 let dpr = 1;
@@ -644,6 +659,22 @@ function drawPen(g, s){
   for(let i=1;i<p.length-1;i++){ const mx=(p[i].x+p[i+1].x)/2, my=(p[i].y+p[i+1].y)/2; g.quadraticCurveTo(p[i].x,p[i].y,mx,my); }
   g.lineTo(p[p.length-1].x, p[p.length-1].y); g.stroke(); g.restore();
 }
+function drawShape(g, sh){
+  const {a, b, w} = sh;
+  g.save(); g.strokeStyle = sh.color; g.fillStyle = sh.color; g.lineWidth = w; g.lineJoin = 'round'; g.lineCap = 'round';
+  if(sh.kind==='rect'){
+    g.strokeRect(Math.min(a.x,b.x), Math.min(a.y,b.y), Math.abs(b.x-a.x), Math.abs(b.y-a.y));
+  } else if(sh.kind==='ellipse'){
+    g.beginPath(); g.ellipse((a.x+b.x)/2, (a.y+b.y)/2, Math.abs(b.x-a.x)/2 || 0.01, Math.abs(b.y-a.y)/2 || 0.01, 0, 0, Math.PI*2); g.stroke();
+  } else {
+    const dx = b.x-a.x, dy = b.y-a.y, L = Math.hypot(dx,dy) || 1, ux = dx/L, uy = dy/L;
+    const head = Math.min(L*0.6, w*6 + w*2), half = head*0.45;
+    const bx = b.x - ux*head, by = b.y - uy*head;
+    g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(bx + ux*w, by + uy*w); g.stroke();
+    g.beginPath(); g.moveTo(b.x, b.y); g.lineTo(bx - uy*half, by + ux*half); g.lineTo(bx + uy*half, by - ux*half); g.closePath(); g.fill();
+  }
+  g.restore();
+}
 function drawText(g, t){
   g.save(); g.font = `700 ${t.size}px ${FONT()}`; g.textBaseline='top'; g.textAlign='left';
   g.lineJoin='round'; g.lineWidth = t.size*0.24; g.strokeStyle='rgba(255,255,255,.92)';
@@ -658,6 +689,7 @@ function renderAnns(g, px, c, handles, skip){
     }
     else if(a.type==='pen') drawPen(g, a);
     else if(a.type==='text') drawText(g, a);
+    else if(a.type==='shape') drawShape(g, a);
   });
 }
 
@@ -686,8 +718,14 @@ function paint(){
     const bb = annBox(S.anns[S.selAnn], px);
     ctx.save(); ctx.strokeStyle = css('--accent'); ctx.lineWidth = px(1.5); ctx.setLineDash([px(5),px(4)]);
     ctx.strokeRect(bb.x, bb.y, bb.w, bb.h); ctx.restore();
+    const sel = S.anns[S.selAnn];
+    if(sel.type==='shape') [sel.a, sel.b].forEach(P => {
+      ctx.beginPath(); ctx.arc(P.x, P.y, px(6), 0, Math.PI*2); ctx.fillStyle = '#fff'; ctx.fill();
+      ctx.lineWidth = px(2); ctx.strokeStyle = css('--accent'); ctx.stroke();
+    });
   }
   if(S.stroke) drawPen(ctx, S.stroke);
+  if(S.shapeDraft) drawShape(ctx, S.shapeDraft);
   if(S.measure){
     drawDim(ctx, S.measure.a, S.measure.b, {color:mark2, label: c ? '実長 '+fmt(realLen(S.measure.a,S.measure.b,c))+' mm' : '縮尺が未設定です', px, handles:true, strong:true});
   }
@@ -741,6 +779,17 @@ function segDist(p,a,b){
 }
 const mctx = document.createElement('canvas').getContext('2d');
 function textBox(t){ mctx.font = `700 ${t.size}px ${FONT()}`; return {x:t.p.x, y:t.p.y, w:mctx.measureText(t.text).width, h:t.size*1.2}; }
+function shapeDist(p, sh){
+  const {a, b} = sh;
+  if(sh.kind==='arrow') return segDist(p, a, b);
+  if(sh.kind==='rect'){
+    const c = [{x:a.x,y:a.y},{x:b.x,y:a.y},{x:b.x,y:b.y},{x:a.x,y:b.y}];
+    return Math.min(...c.map((q,i) => segDist(p, q, c[(i+1)%4])));
+  }
+  const cx = (a.x+b.x)/2, cy = (a.y+b.y)/2, rx = Math.abs(b.x-a.x)/2 || 0.01, ry = Math.abs(b.y-a.y)/2 || 0.01;
+  const t = Math.hypot((p.x-cx)/rx, (p.y-cy)/ry);
+  return Math.abs(t-1) * Math.min(rx, ry);
+}
 function hitAnn(p){
   const tol = (COARSE ? 20 : 10)/S.view.k;
   for(let i=S.anns.length-1;i>=0;i--){
@@ -751,6 +800,7 @@ function hitAnn(p){
       for(let j=1;j<a.pts.length;j++) if(segDist(p,a.pts[j-1],a.pts[j]) < tol+a.w/2) return i;
     }
     if(a.type==='text'){ const b=textBox(a); if(p.x>b.x-tol && p.x<b.x+b.w+tol && p.y>b.y-tol && p.y<b.y+b.h+tol) return i; }
+    if(a.type==='shape' && shapeDist(p, a) < tol + a.w/2) return i;
   }
   return -1;
 }
@@ -792,19 +842,21 @@ function shiftAnn(o, dx, dy){
   if(a.type==='dim'){ a.a = mv(a.a); a.b = mv(a.b); }
   else if(a.type==='pen') a.pts = a.pts.map(mv);
   else if(a.type==='text') a.p = mv(a.p);
+  else if(a.type==='shape'){ a.a = mv(a.a); a.b = mv(a.b); }
   return a;
 }
 function annBox(a, px){
   let xs, ys, pad = px(8);
   if(a.type==='text'){ const b = textBox(a); return {x:b.x-pad, y:b.y-pad, w:b.w+pad*2, h:b.h+pad*2}; }
   if(a.type==='dim'){ xs = [a.a.x, a.b.x]; ys = [a.a.y, a.b.y]; pad = px(26); }
+  else if(a.type==='shape'){ xs = [a.a.x, a.b.x]; ys = [a.a.y, a.b.y]; pad += a.w*(a.kind==='arrow' ? 4 : 0.5); }
   else { xs = a.pts.map(p => p.x); ys = a.pts.map(p => p.y); pad += a.w/2; }
   const x0 = Math.min(...xs), y0 = Math.min(...ys);
   return {x:x0-pad, y:y0-pad, w:Math.max(...xs)-x0+pad*2, h:Math.max(...ys)-y0+pad*2};
 }
 function undo(){ if(!S.hist.length) return; commitText(true); S.future.push(JSON.stringify(S.anns)); S.anns = JSON.parse(S.hist.pop()); annsChanged(); }
 function redo(){ if(!S.future.length) return; commitText(true); S.hist.push(JSON.stringify(S.anns)); S.anns = JSON.parse(S.future.pop()); annsChanged(); }
-function annsChanged(){ if(!S.anns[S.selAnn]) S.selAnn = -1; draw(); updateDerived(); syncSizeUi(); }
+function annsChanged(){ if(!S.anns[S.selAnn]) S.selAnn = -1; draw(); updateDerived(); syncSizeUi(); syncShapeUi(); }
 
 /* ---------- pointer ---------- */
 let drag = null, shiftDown = false, spaceDown = false;
@@ -814,7 +866,14 @@ function snap(a, b, on){
   if(!on) return b;
   return Math.abs(b.x-a.x) >= Math.abs(b.y-a.y) ? {x:b.x, y:a.y} : {x:a.x, y:b.y};
 }
-const DRAW_TOOLS = ['line','measure','pen','text','erase'];
+const DRAW_TOOLS = ['line','measure','pen','text','erase','shape'];
+// keep circles/squares round, arrows straight
+function constrainShape(a, b, on, kind){
+  if(!on) return b;
+  if(kind==='arrow') return snap(a, b, true);
+  const d = Math.max(Math.abs(b.x-a.x), Math.abs(b.y-a.y));
+  return {x:a.x + Math.sign(b.x-a.x || 1)*d, y:a.y + Math.sign(b.y-a.y || 1)*d};
+}
 cv.addEventListener('pointerdown', e => {
   if(!S.src) return;
   if(!dimEd.hidden && e.button===0 && S.tool!=='pan' && !spaceDown) closeDimEd();
@@ -824,6 +883,7 @@ cv.addEventListener('pointerdown', e => {
   if(pts.size === 2){
     if(drag && drag.type==='draw' && drag.moved) S.pending = null;
     if(drag && drag.type==='pen') S.stroke = null;
+    S.shapeDraft = null;
     const [p1,p2] = [...pts.values()];
     drag = {type:'pinch', d:Math.hypot(p1.x-p2.x,p1.y-p2.y), cx:(p1.x+p2.x)/2, cy:(p1.y+p2.y)/2};
     draw(); return;
@@ -843,6 +903,17 @@ cv.addEventListener('pointerdown', e => {
     }
     drag = {type:'draw', start:sp, sp:p, moved:false}; return;
   }
+  if(S.tool==='shape'){
+    S.shapeDraft = {type:'shape', kind:S.shapeKind, a:sp, b:sp, color:COLORS[S.color], w:S.mm.shape/mmpp()};
+    drag = {type:'shape', sp:p}; draw(); return;
+  }
+  if(S.tool==='select' && S.anns[S.selAnn] && S.anns[S.selAnn].type==='shape'){
+    const sh = S.anns[S.selAnn], R = COARSE ? 24 : 12;
+    for(const key of ['a','b']){
+      const P = toScr(sh[key]);
+      if(Math.hypot(P.x-p.x, P.y-p.y) < R){ drag = {type:'shapeEnd', key, sh, pushed:false}; return; }
+    }
+  }
   if(S.tool==='pen'){
     S.stroke = {type:'pen', pts:[sp], color:COLORS[S.color], w:S.mm.pen/mmpp()};
     drag = {type:'pen', last:p}; draw(); return;
@@ -857,13 +928,13 @@ cv.addEventListener('pointerdown', e => {
         if(S.tool==='select'){
           S.selAnn = j;
           S.styleHist = false;
-          markStyle(colorKey(a.color)); syncSizeUi();
+          markStyle(colorKey(a.color)); syncSizeUi(); syncShapeUi();
         }
         drag = {type:'grab', idx:j, s0:sp, sp:p, orig:JSON.parse(JSON.stringify(a)), moved:false};
         draw(); return;
       }
     }
-    if(S.tool==='select'){ S.selAnn = -1; syncSizeUi(); drag = {type:'pan', x:p.x, y:p.y, ox:S.view.ox, oy:S.view.oy}; draw(); return; }
+    if(S.tool==='select'){ S.selAnn = -1; syncSizeUi(); syncShapeUi(); drag = {type:'pan', x:p.x, y:p.y, ox:S.view.ox, oy:S.view.oy}; draw(); return; }
   }
   if(S.tool==='text'){ drag = {type:'tap', sp:p}; return; }
   if(S.tool==='erase'){ drag = {type:'erase', pushed:false}; eraseAt(sp); return; }
@@ -914,6 +985,15 @@ cv.addEventListener('pointermove', e => {
     if(Math.hypot(p.x-drag.sp.x, p.y-drag.sp.y) > 6 && !S.pending){ drag.moved = true; S.pending = drag.start; }
     draw(); return;
   }
+  if(drag.type==='shape'){
+    S.shapeDraft.b = constrainShape(S.shapeDraft.a, toSrc(p), e.shiftKey||S.ortho, S.shapeDraft.kind); draw(); return;
+  }
+  if(drag.type==='shapeEnd'){
+    if(!drag.pushed){ pushHist(); drag.pushed = true; }
+    const other = drag.sh[drag.key==='a' ? 'b' : 'a'];
+    drag.sh[drag.key] = constrainShape(other, toSrc(p), e.shiftKey||S.ortho, drag.sh.kind);
+    cv.style.cursor = 'grabbing'; draw(); return;
+  }
   if(drag.type==='pen'){
     const evs = (e.getCoalescedEvents && e.getCoalescedEvents().length) ? e.getCoalescedEvents() : [e];
     let added = false;
@@ -937,6 +1017,12 @@ function endPointer(e){
     else if(e.pointerType === 'mouse'){ S.pending = drag.start; setTip('終点をクリック（Escで取り消し）'); }
   }
   if(drag.type==='pen' && S.stroke){ pushHist(); S.anns.push(S.stroke); S.stroke = null; annsChanged(); }
+  if(drag.type==='shape' && S.shapeDraft){
+    const d = S.shapeDraft; S.shapeDraft = null;
+    if(Math.hypot(d.b.x-d.a.x, d.b.y-d.a.y)*S.view.k > 8){ pushHist(); S.anns.push(d); }
+    annsChanged();
+  }
+  if(drag.type==='shapeEnd' && drag.pushed) annsChanged();
   if(drag.type==='tap' && Math.hypot(p.x-drag.sp.x, p.y-drag.sp.y) < 8){
     const sp = toSrc(p), hit = hitAnn(sp);
     if(hit>=0 && S.anns[hit].type==='text') openText(null, hit); else openText(sp, -1);
@@ -950,7 +1036,7 @@ function endPointer(e){
   drag = null; draw();
 }
 cv.addEventListener('pointerup', endPointer);
-cv.addEventListener('pointercancel', e => { pts.delete(e.pointerId); if(drag && drag.type==='pen') S.stroke=null; drag=null; draw(); });
+cv.addEventListener('pointercancel', e => { pts.delete(e.pointerId); if(drag && drag.type==='pen') S.stroke=null; S.shapeDraft = null; drag=null; draw(); });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 // a tap on the drawing must not steal focus from the field the tenkey is typing into
 cv.addEventListener('mousedown', e => e.preventDefault());
@@ -1091,25 +1177,42 @@ function setTipDefault(){
     pen: 'ペン：なぞって書き込み' + (S.penOnly ? '（指は画面の移動・拡大）' : ''),
     text: '文字：書き込みたい場所をタップ（文字をタップで修正、ドラッグで移動）',
     erase: '消しゴム：消したい書き込みをタップ、またはなぞる',
-    select: '動かす：書き込みをつかんで移動。選んでから色・大きさを押すと変更できます',
+    select: '動かす：書き込みをつかんで移動。選んでから色・大きさを変更。図形は角の丸で大きさ変更',
+    shape: '図形：ドラッグして描く（円・四角・矢印を上で選択／Shiftで正円・正方形・水平垂直）',
     pan: COARSE ? (S.phase==='scale' ? '指で移動・2本指で拡大／「寸法合わせ」を押してから寸法をなぞる' : '指で移動・2本指で拡大／使いたい道具を上から選ぶ') : 'ドラッグで移動・ホイールで拡大縮小'
   };
   setTip(t[S.tool]);
 }
-const PHASE_TOOLS = {scale:['line','pan'], work:['measure','pen','text','erase','select','pan']};
+const PHASE_TOOLS = {scale:['line','pan'], work:['measure','pen','text','erase','shape','select','pan']};
 function setTool(t){
   if(PHASE_TOOLS[S.phase] && !PHASE_TOOLS[S.phase].includes(t)) return;
   commitText();
   S.tool = t; S.pending = null;
   document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool===t));
-  $('#optColor').hidden = !['measure','pen','text','select'].includes(t);
+  $('#optColor').hidden = !['measure','pen','text','select','shape'].includes(t);
+  syncShapeUi();
   syncSizeUi();
-  $('#orthoBtn').hidden = !['line','measure'].includes(t);
+  $('#orthoBtn').hidden = !['line','measure','shape'].includes(t);
   $('#penOnlyBtn').hidden = !(COARSE || S.penSeen) || !DRAW_TOOLS.includes(t);
-  $('#optBar').hidden = !['line','measure','pen','text','select'].includes(t) && $('#penOnlyBtn').hidden;
+  $('#optBar').hidden = !['line','measure','pen','text','select','shape'].includes(t) && $('#penOnlyBtn').hidden;
   setTipDefault(); draw();
 }
 document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
+function syncShapeUi(){
+  const sel = S.tool==='select' ? S.anns[S.selAnn] : null;
+  const show = S.tool==='shape' || (sel && sel.type==='shape');
+  $('#optShape').hidden = !show;
+  const kind = sel && sel.type==='shape' ? sel.kind : S.shapeKind;
+  document.querySelectorAll('#shapeSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v===kind));
+  const ob = $('#orthoBtn');
+  ob.textContent = S.tool==='shape' ? (kind==='arrow' ? '水平・垂直に固定' : '正円・正方形に固定') : '水平・垂直に固定';
+}
+segGroup('#shapeSeg', v => {
+  const sel = S.tool==='select' ? S.anns[S.selAnn] : null;
+  if(sel && sel.type==='shape'){ pushHist(); sel.kind = v; annsChanged(); }
+  else S.shapeKind = v;
+  syncShapeUi();
+});
 function markStyle(color){
   if(color) document.querySelectorAll('#optColor .sw').forEach(x => x.setAttribute('aria-pressed', x.dataset.c===color));
 }
@@ -1118,17 +1221,18 @@ const colorKey = hex => Object.keys(COLORS).find(k => COLORS[k]===hex);
 function sizeKind(){
   if(S.tool==='text') return 'text';
   if(S.tool==='pen') return 'pen';
+  if(S.tool==='shape') return 'shape';
   if(S.tool==='measure') return 'dim';
   if(S.tool==='select'){ const a = S.anns[S.selAnn]; return a ? a.type : null; }
   return null;
 }
-const SIZE_LABEL = {text:'文字サイズ', pen:'線の太さ', dim:'寸法の文字'};
+const SIZE_LABEL = {text:'文字サイズ', pen:'線の太さ', dim:'寸法の文字', shape:'線の太さ'};
 function currentMM(kind){
   const m = mmpp();
   if(kind==='text' && !ted.hidden) return S.textSize*m;
   if(S.tool==='select'){
     const a = S.anns[S.selAnn];
-    if(a){ if(a.type==='text') return a.size*m; if(a.type==='pen') return a.w*m; if(a.type==='dim') return (a.fs || S.mm.dim/m)*m; }
+    if(a){ if(a.type==='text') return a.size*m; if(a.type==='pen' || a.type==='shape') return a.w*m; if(a.type==='dim') return (a.fs || S.mm.dim/m)*m; }
   }
   return S.mm[kind];
 }
@@ -1137,7 +1241,7 @@ function syncSizeUi(){
   box.hidden = !k; if(!k) return;
   $('#sizeLbl').textContent = SIZE_LABEL[k];
   const inp = $('#sizeVal');
-  inp.step = k==='pen' ? '0.1' : '0.5';
+  inp.step = (k==='pen' || k==='shape') ? '0.1' : '0.5';
   if(document.activeElement !== inp && TK.target !== inp) inp.value = +currentMM(k).toFixed(2);
 }
 // apply a size (paper mm) to what is being drawn, typed or selected
@@ -1150,7 +1254,7 @@ function setSizeMM(mm){
   const a = S.tool==='select' ? S.anns[S.selAnn] : null;
   if(!a) return;
   if(!S.styleHist){ pushHist(); S.styleHist = true; }
-  if(a.type==='text') a.size = mm/m; else if(a.type==='pen') a.w = mm/m; else if(a.type==='dim') a.fs = mm/m;
+  if(a.type==='text') a.size = mm/m; else if(a.type==='pen' || a.type==='shape') a.w = mm/m; else if(a.type==='dim') a.fs = mm/m;
   draw(); updateCounts();
 }
 $('#sizeVal').addEventListener('input', e => setSizeMM(parseFloat(e.target.value)));
@@ -1211,7 +1315,7 @@ window.addEventListener('keydown', e => {
     else if(S.tool==='line' && S.sel>=0){ S.lines.splice(S.sel,1); S.sel=-1; renderList(); draw(); }
     else if(S.tool==='select' && S.anns[S.selAnn]){ pushHist(); S.anns.splice(S.selAnn,1); S.selAnn=-1; annsChanged(); }
   }
-  const map = {l:'line', m:'measure', p:'pen', t:'text', e:'erase', v:'select', h:'pan'};
+  const map = {l:'line', m:'measure', p:'pen', t:'text', e:'erase', s:'shape', v:'select', h:'pan'};
   const k = e.key.toLowerCase();
   if(!e.metaKey && !e.ctrlKey && !e.altKey && map[k]) setTool(map[k]);
 });
@@ -1245,6 +1349,7 @@ $('#rot').onclick = () => {
     if(a.type==='dim'){ a.a=rp(a.a); a.b=rp(a.b); }
     if(a.type==='pen') a.pts = a.pts.map(rp);
     if(a.type==='text') a.p = rp(a.p);
+    if(a.type==='shape'){ a.a = rp(a.a); a.b = rp(a.b); }
   });
   S.hist = [];
   rotateCanvas(); updateBadge(); fit(); updateDerived();
@@ -1285,7 +1390,7 @@ function refreshMeta(){
 }
 function updateCounts(){
   const n = t => S.anns.filter(a => a.type===t).length;
-  $('#cntDim').textContent = n('dim'); $('#cntPen').textContent = n('pen'); $('#cntText').textContent = n('text');
+  $('#cntDim').textContent = n('dim'); $('#cntPen').textContent = n('pen'); $('#cntText').textContent = n('text'); $('#cntShape').textContent = n('shape');
   $('#undoBtn').disabled = $('#undoBtn2').disabled = !S.hist.length;
   $('#redoBtn').disabled = !S.future.length;
 }
