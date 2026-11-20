@@ -348,6 +348,7 @@ input.tk-active{outline:2px solid var(--accent);outline-offset:1px}
         <li>図面の中の寸法（通り芯間など）を、端から端までなぞる</li>
         <li>その寸法の実寸を mm で入力する</li>
         <li>線を2本以上引くと精度が上がります</li>
+        <li>引いた線はダブルクリック（ダブルタップ）で実寸を入れ直せます</li>
       </ol>
       <div class="row">
         <div class="field"><label for="ratio">目標の縮尺</label>
@@ -397,6 +398,7 @@ input.tk-active{outline:2px solid var(--accent);outline-offset:1px}
         <li><b>ペン</b>・<b>文字</b>で書き込み、<b>消しゴム</b>で削除</li>
         <li><b>図形</b>：円・四角形・矢印をドラッグで描く（Shiftで正円・正方形）</li>
         <li><b>動かす</b>：寸法・文字・ペン・図形をつかんで移動。図形は角の丸で大きさを変更</li>
+        <li><b>修正</b>：書き込みを<b>ダブルクリック</b>（iPad・スマホは<b>ダブルタップ</b>）。文字は内容、寸法・図形は位置・長さ・色・サイズを直せます</li>
       </ul>
       <div class="counts"><span>残した寸法 <b id="cntDim">0</b></span><span>ペン <b id="cntPen">0</b></span><span>文字 <b id="cntText">0</b></span><span>図形 <b id="cntShape">0</b></span></div>
       <div class="row">
@@ -719,7 +721,7 @@ function paint(){
     ctx.save(); ctx.strokeStyle = css('--accent'); ctx.lineWidth = px(1.5); ctx.setLineDash([px(5),px(4)]);
     ctx.strokeRect(bb.x, bb.y, bb.w, bb.h); ctx.restore();
     const sel = S.anns[S.selAnn];
-    if(sel.type==='shape') [sel.a, sel.b].forEach(P => {
+    if(sel.type==='shape' || sel.type==='dim') [sel.a, sel.b].forEach(P => {
       ctx.beginPath(); ctx.arc(P.x, P.y, px(6), 0, Math.PI*2); ctx.fillStyle = '#fff'; ctx.fill();
       ctx.lineWidth = px(2); ctx.strokeStyle = css('--accent'); ctx.stroke();
     });
@@ -870,7 +872,7 @@ const DRAW_TOOLS = ['line','measure','pen','text','erase','shape'];
 // keep circles/squares round, arrows straight
 function constrainShape(a, b, on, kind){
   if(!on) return b;
-  if(kind==='arrow') return snap(a, b, true);
+  if(kind==='arrow' || !kind) return snap(a, b, true);
   const d = Math.max(Math.abs(b.x-a.x), Math.abs(b.y-a.y));
   return {x:a.x + Math.sign(b.x-a.x || 1)*d, y:a.y + Math.sign(b.y-a.y || 1)*d};
 }
@@ -887,6 +889,13 @@ cv.addEventListener('pointerdown', e => {
     const [p1,p2] = [...pts.values()];
     drag = {type:'pinch', d:Math.hypot(p1.x-p2.x,p1.y-p2.y), cx:(p1.x+p2.x)/2, cy:(p1.y+p2.y)/2};
     draw(); return;
+  }
+  // double-click (mouse) / double-tap (finger, Apple Pencil) on writing opens it for editing
+  if(e.button===0 && !spaceDown){
+    const now = performance.now();
+    const dbl = lastTap && now - lastTap.t < 420 && Math.hypot(p.x-lastTap.x, p.y-lastTap.y) < (e.pointerType==='mouse' ? 10 : 30);
+    lastTap = {t:now, x:p.x, y:p.y};
+    if(dbl && S.tool !== 'erase' && editAt(p)){ lastTap = null; drag = null; return; }
   }
   const fingerPans = e.pointerType==='touch' && S.penOnly && DRAW_TOOLS.includes(S.tool);
   if(S.tool==='pan' || e.button===1 || e.button===2 || spaceDown || fingerPans){
@@ -907,7 +916,7 @@ cv.addEventListener('pointerdown', e => {
     S.shapeDraft = {type:'shape', kind:S.shapeKind, a:sp, b:sp, color:COLORS[S.color], w:S.mm.shape/mmpp()};
     drag = {type:'shape', sp:p}; draw(); return;
   }
-  if(S.tool==='select' && S.anns[S.selAnn] && S.anns[S.selAnn].type==='shape'){
+  if(S.tool==='select' && S.anns[S.selAnn] && (S.anns[S.selAnn].type==='shape' || S.anns[S.selAnn].type==='dim')){
     const sh = S.anns[S.selAnn], R = COARSE ? 24 : 12;
     for(const key of ['a','b']){
       const P = toScr(sh[key]);
@@ -1016,7 +1025,11 @@ function endPointer(e){
     if(drag.moved || S.pending){ finish(S.pending, snap(S.pending, b, snapOn)); }
     else if(e.pointerType === 'mouse'){ S.pending = drag.start; setTip('終点をクリック（Escで取り消し）'); }
   }
-  if(drag.type==='pen' && S.stroke){ pushHist(); S.anns.push(S.stroke); S.stroke = null; annsChanged(); }
+  if(drag.type==='pen' && S.stroke){
+    const st = S.stroke; pushHist(); S.anns.push(st); S.stroke = null;
+    S.lastDot = st.pts.length === 1 ? {ann:st, t:performance.now()} : null;
+    annsChanged();
+  }
   if(drag.type==='shape' && S.shapeDraft){
     const d = S.shapeDraft; S.shapeDraft = null;
     if(Math.hypot(d.b.x-d.a.x, d.b.y-d.a.y)*S.view.k > 8){ pushHist(); S.anns.push(d); }
@@ -1042,6 +1055,48 @@ cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('mousedown', e => e.preventDefault());
 cv.addEventListener('wheel', e => { e.preventDefault(); const p=local(e); zoomAt(Math.exp(-e.deltaY*0.0015), p.x, p.y); }, {passive:false});
 
+let lastTap = null;
+function selectAnn(i){
+  setTool('select');
+  const a = S.anns[i]; if(!a) return;
+  S.selAnn = i; S.styleHist = false;
+  markStyle(colorKey(a.color)); syncSizeUi(); syncShapeUi(); draw();
+}
+// returns true when something was opened for editing
+function editAt(p){
+  const sp = toSrc(p);
+  if(S.phase === 'scale'){
+    const tol = COARSE ? 22 : 10;
+    for(let i=S.lines.length-1;i>=0;i--){
+      const l = S.lines[i];
+      if(segDist(p, toScr(l.a), toScr(l.b)) < tol){
+        S.pending = null; S.sel = i; renderList(); draw();
+        const inp = document.getElementById('real-'+i);
+        if(lastPT === 'mouse') openDimEd(i);
+        else if(inp){ inp.inputMode = 'none'; tkOpen(inp); keepAbovePad({x:(l.a.x+l.b.x)/2, y:(l.a.y+l.b.y)/2}); }
+        return true;
+      }
+    }
+    return false;
+  }
+  if(S.phase !== 'work') return false;
+  // a pen dot left by the first tap of the double-tap is not wanted
+  if(S.lastDot && performance.now() - S.lastDot.t < 600 && S.anns[S.anns.length-1] === S.lastDot.ann){
+    S.anns.pop(); S.hist.pop(); S.lastDot = null;
+  }
+  S.pending = null; S.shapeDraft = null; S.stroke = null;
+  const i = hitAnn(sp);
+  if(i < 0){ annsChanged(); return false; }
+  const a = S.anns[i];
+  if(a.type === 'text'){ setTool('text'); openText(null, S.anns.indexOf(a)); }
+  else selectAnn(S.anns.indexOf(a));
+  updateDerived();
+  setTip(a.type==='text' ? '文字を修正中：入力して Enter（色・サイズも変更できます）'
+    : a.type==='dim' ? '寸法を修正中：つかんで移動・端の丸で長さ調整・色や文字サイズを変更'
+    : a.type==='shape' ? '図形を修正中：つかんで移動・角の丸で大きさ変更・種類や色・太さを変更'
+    : 'ペンの線を修正中：つかんで移動・色や太さを変更');
+  return true;
+}
 function eraseAt(sp){
   const i = hitAnn(sp); if(i<0) return;
   if(!drag.pushed){ pushHist(); drag.pushed = true; }
@@ -1167,6 +1222,14 @@ ted.addEventListener('keydown', e => {
   if(e.key==='Escape'){ commitText(true); }
 });
 ted.addEventListener('blur', () => { if(!TK.switching) commitText(); });
+// the empty box opened by the first click of a double-click sits under the pointer: treat the second click as the double-click
+ted.addEventListener('pointerdown', e => {
+  if(S.editing !== undefined || ted.value !== '' || !lastTap || performance.now() - lastTap.t > 420) return;
+  const p = local(e);
+  e.preventDefault();
+  commitText(true); lastTap = null;
+  editAt(p);
+});
 
 /* ---------- tools / keyboard ---------- */
 function setTip(t){ $('#tip').textContent = t; }
@@ -1177,7 +1240,7 @@ function setTipDefault(){
     pen: 'ペン：なぞって書き込み' + (S.penOnly ? '（指は画面の移動・拡大）' : ''),
     text: '文字：書き込みたい場所をタップ（文字をタップで修正、ドラッグで移動）',
     erase: '消しゴム：消したい書き込みをタップ、またはなぞる',
-    select: '動かす：書き込みをつかんで移動。選んでから色・大きさを変更。図形は角の丸で大きさ変更',
+    select: '動かす：書き込みをつかんで移動。選んでから色・大きさを変更。ダブルクリックでも修正できます',
     shape: '図形：ドラッグして描く（円・四角・矢印を上で選択／Shiftで正円・正方形・水平垂直）',
     pan: COARSE ? (S.phase==='scale' ? '指で移動・2本指で拡大／「寸法合わせ」を押してから寸法をなぞる' : '指で移動・2本指で拡大／使いたい道具を上から選ぶ') : 'ドラッグで移動・ホイールで拡大縮小'
   };
